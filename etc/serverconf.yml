@@ -1,0 +1,10 @@
+mqtt:
+  subtopic: "server_control"
+  pubtopic: "server_cmd"
+  qos: 1
+  serveraddress: "tcp://39.98.198.244:1883"
+  clientid: "rtmpserver1"
+  writelog: false
+  writetodisk: false
+  outputfile: "./receivedMessages.txt"
+  hearttime: 30
