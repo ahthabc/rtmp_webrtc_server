@@ -1,10 +1,5 @@
 
-var SERVER_NAME="50:9a:4c:3c:2d:b5"//document.getElementById("serverId").value;
-if(SERVER_NAME===""){
-    SERVER_NAME="50:9a:4c:3c:2d:b5";
-}
-var subtopic = "server_cmd/" +SERVER_NAME+ "/"+ WEB_SEQID + "/#";//+"/"+deviceID //Control/00:13:14:01:D9:D5
-var pubtopic = "server_control" + "/" + SERVER_NAME;
+
 function initMqtt() {
 
     var ClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8)

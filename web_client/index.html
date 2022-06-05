@@ -38,25 +38,8 @@
       </video>
     </div> -->
   </body>
+  <script src="start.js"></script>
   <script src="webrtc.js"></script>
   <script src="mqtt.js"></script>
   <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/2.18.8/mqtt.min.js"></script>  
-  <script>
-    var pc;
-    var mqttclient;
-    var WEB_SEQID;
-    var suuid;
-    var MqttServer = "ws://39.98.198.244:8083/mqtt";
-    function log(msg) {
-      console.log(msg);
-        // $("#loger").html(msg);
-    }
-    function startSession() {
-      initMqtt();
-    }
-    function endSession(){
-      endMqtt();
-      endWebrtc();
-    }
-  </script>
 </html>

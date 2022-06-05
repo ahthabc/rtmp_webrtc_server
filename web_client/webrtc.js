@@ -27,28 +27,7 @@
     //   .then(res => pc.setRemoteDescription(res))
     //   .catch(alert)
 
-let bVideo=true;
-let bAudio=true;
-var bWebrtc = false;
-const CMDMSG_OFFER = "offer"
-var STREAMNAME=document.getElementById("streamId").value;
-if(STREAMNAME===""){
-    STREAMNAME="test";
-}
-let media_mode = "rtmp";
-var ICEServer = [
-    {
-        url: "stun:192.168.0.18:3478"
-        // url: "stun:39.98.198.244:3478"
-        //url:"stun:stun.l.google.com:19302"
 
-    }, {
-        url: "turn:192.168.0.18:3478",
-        // url: "turn:39.98.198.244:3478",
-        username: "media",
-        credential: "123456"
-    }
-];
 function suuid() {
      
 	var s = [];
