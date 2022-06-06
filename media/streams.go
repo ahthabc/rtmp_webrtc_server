@@ -11,6 +11,7 @@ import (
 	"github.com/Glimesh/go-fdkaac/fdkaac"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/xiangxud/rtmp_webrtc_server/config"
 	opus "github.com/xiangxud/rtmp_webrtc_server/opus"
 )
 
@@ -84,7 +85,14 @@ func (p *Peer) SendPeerAudio(audiodata []byte) error {
 	if p.status != PEER_CONNECT {
 		return fmt.Errorf("peer is not connected,status %d", p.status)
 	}
-	log.Println("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
+	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+		p.status = PEER_CONNECT
+		p.endTime = time.Now()
+		return fmt.Errorf("peer is closed,status %d", p.status)
+	}
+	if config.Config.Stream.Debug {
+		log.Println("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
+	}
 	if audioErr := p.audioTrack.WriteSample(media.Sample{
 		Data:     audiodata,
 		Duration: 20 * time.Millisecond,
@@ -97,6 +105,11 @@ func (p *Peer) SendPeerAudio(audiodata []byte) error {
 func (p *Peer) SendPeerVideo(videodata []byte) error {
 	if p.status != PEER_CONNECT {
 		return fmt.Errorf("peer is not connected,status %d", p.status)
+	}
+	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+		p.status = PEER_CONNECT
+		p.endTime = time.Now()
+		return fmt.Errorf("peer is closed,status %d", p.status)
 	}
 	if vedioErr := p.videoTrack.WriteSample(media.Sample{
 		Data:     videodata,
@@ -238,7 +251,9 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 		errs = append(errs, fmt.Errorf("decode error"))
 		return errs
 	}
-	log.Println("\r\npcm len ", len(pcm), " ->") //, pcm)
+	if config.Config.Stream.Debug {
+		log.Println("\r\npcm len ", len(pcm), " ->") //, pcm)
+	}
 	blockSize := 960
 	for s.audioBuffer = append(s.audioBuffer, pcm...); len(s.audioBuffer) >= blockSize*4; s.audioBuffer = s.audioBuffer[blockSize*4:] {
 		pcm16 := make([]int16, blockSize*2)
@@ -261,7 +276,9 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 		}
 		opusOutput := opusData[:n]
 		for pname, p := range s.peers {
-			log.Println("peer ", pname)
+			if config.Config.Stream.Debug {
+				log.Println("peer ", pname)
+			}
 			if p.streamName == s.streamName {
 				//log.Printf(" send audio data ")
 				err := p.SendPeerAudio(opusOutput)
@@ -279,9 +296,13 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 func (s *Stream) SendStreamVideo(datas []byte) []error {
 	var errs []error
 	for pname, p := range s.peers {
-		log.Println("peer ", pname)
+		if config.Config.Stream.Debug {
+			log.Println("peer ", pname)
+		}
 		if p.streamName == s.streamName {
-			log.Printf(" send video data ")
+			if config.Config.Stream.Debug {
+				log.Printf(" send video data ")
+			}
 			err := p.SendPeerVideo(datas)
 			if err != nil {
 				errs = append(errs, err)
@@ -313,7 +334,14 @@ func (m *StreamManager) AddStream(s *Stream) error {
 		return errors.New("stream is not exsit")
 	}
 	if s.streamName != "" {
-		m.streams[s.streamName] = s
+		// m.streams[s.streamName] = s
+		//原来存在这个源就直接改状态
+		if ss := m.streams[s.streamName]; ss == nil {
+			m.streams[s.streamName] = s
+		} else {
+			ss.startTime = time.Now()
+			ss.status = PEER_CONNECT
+		}
 		return nil
 	} else {
 		return errors.New("stream is not exsit")
@@ -328,11 +356,11 @@ func (m *StreamManager) DeleteStream(name string) error {
 
 	if s != nil {
 		s.status = STREAM_DEADLINE
-		go func() { //防止正在使用，先设置状态，然后延迟再删除，如果还有冲突，就先不删除，一般是在stream推流关闭时才调用一般不会出问题
-			time.Sleep(time.Duration(2) * time.Second)
-			s.ReleaseAudio()
-			delete(m.streams, name)
-		}()
+		// go func() { //防止正在使用，先设置状态，然后延迟再删除，如果还有冲突，就先不删除，一般是在stream推流关闭时才调用一般不会出问题
+		// 	time.Sleep(time.Duration(2) * time.Second)
+		// 	s.ReleaseAudio()
+		// 	delete(m.streams, name)
+		// }()
 		return nil
 	} else {
 		return errors.New("stream is not exsit")

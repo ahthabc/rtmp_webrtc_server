@@ -8,3 +8,5 @@ mqtt:
   writetodisk: false
   outputfile: "./receivedMessages.txt"
   hearttime: 30
+stream:
+  debug: false

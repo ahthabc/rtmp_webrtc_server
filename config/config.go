@@ -11,9 +11,12 @@ import (
 )
 
 type ConfigT struct {
-	Mqtt mqttSection `yaml:"mqtt" mapstructure:"mqtt"`
+	Mqtt   mqttSection   `yaml:"mqtt" mapstructure:"mqtt"`
+	Stream streamSection `yaml:"stream" mapstructure:"stream"`
 }
-
+type streamSection struct {
+	Debug bool `yaml:"debug" mapstructure:"debug"`
+}
 type mqttSection struct {
 	SUBTOPIC      string `yaml:"subtopic" mapstructure:"subtopic"` //"topic1"
 	PUBTOPIC      string `yaml:"pubtopic" mapstructure:"pubtopic"`

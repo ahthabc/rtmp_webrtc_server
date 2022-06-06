@@ -452,5 +452,5 @@ func StartMqtt() {
 	<-sig
 	fmt.Println("signal caught - exiting")
 	client.Disconnect(1000)
-	fmt.Println("shutdown complete")
+	fmt.Println("mqtt shutdown complete")
 }

@@ -86,4 +86,5 @@ func TurnServer() {
 	if err = s.Close(); err != nil {
 		log.Panic(err)
 	}
+	log.Println("turn server exit")
 }

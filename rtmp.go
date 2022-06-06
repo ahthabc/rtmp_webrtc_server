@@ -8,6 +8,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/pkg/errors"
 	// "github.com/xiangxud/go-rtmp"
@@ -48,9 +51,22 @@ func startRTMPServer(streammanager *media_interface.StreamManager) {
 			}
 		},
 	})
-	if err := srv.Serve(listener); err != nil {
-		log.Panicf("Failed: %+v", err)
+
+	go func() {
+		log.Println("RTMP server starting...")
+		if err := srv.Serve(listener); err != nil {
+			log.Panicf("Failed: %+v", err)
+		}
+	}()
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
+
+	if err = srv.Close(); err != nil {
+		log.Panic(err)
 	}
+	log.Println("rtmp server exit")
+
 }
 
 type Handler struct {

@@ -60,30 +60,29 @@ function initWebRTC() {
             document.getElementById('remote-video').appendChild(el)
         //     if(event.track.kind==="video"){
 
-        //     trackCache = event.track;
-        //     var el = document.getElementById('remote-video')
-        //     resStream = event.streams[0].clone()
-        //     resStream.addTrack(trackCache)
-        //     el.srcObject = resStream
+        //         trackCache = event.track;
+        //         var el = document.getElementById('remote-video')
+        //         resStream = event.streams[0].clone()
+        //         resStream.addTrack(trackCache)
+        //         el.srcObject = resStream
            
         //     }else{
-        //     var el = document.createElement(event.track.kind);
-        //     el.srcObject = event.streams[0];
-        //     el.autoplay = true;
+        //         var el = document.createElement(event.track.kind);
+        //         el.srcObject = event.streams[0];
+        //         el.autoplay = true;
 
-        //     document.getElementById("remote-video").appendChild(el);
+        //         document.getElementById("remote-video").appendChild(el);
 
-        //     if (el.nodeName === "AUDIO") {
-        //         el.oncanplay = () => {
-        //             // el.style = "autoplay"
-        //             el.controls = false; // 显示
-        //             el.autoplay = true;
-        //         };
-        //     }
+        //         if (el.nodeName === "AUDIO") {
+        //             el.oncanplay = () => {
+        //                 // el.style = "autoplay"
+        //                 el.controls = false; // 显示
+        //                 el.autoplay = true;
+        //             };
+        //         }
+        
         // }
-        }
-
-
+    }
         pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 
 
