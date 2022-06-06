@@ -31,8 +31,16 @@ import (
 )
 
 const (
-	CMDMSG_OFFER = "offer"
-	MODE_RTMP    = "rtmp"
+	CMDMSG_OFFER      = "offer"
+	CMDMSG_ANSWER     = "answer"
+	CMDMSG_ERROR      = "error"
+	CMDMSG_STOPPEER   = "stoppeer"
+	CMDMSG_RESUMEPEER = "resumepeer"
+	CMDMSG_DELETEPEER = "deletepeer"
+	MODE_RTMP         = "rtmp"
+	TOPIC_ANSWER      = "answer"
+	TOPIC_ERROR       = "error"
+	TOPIC_REFUSE      = "refuse"
 )
 
 var (
@@ -104,12 +112,8 @@ func SendMsg(msg PublishMsg) {
 
 // Add a single video track
 func createPeerConnection(msg Message) {
-	log.Println("Incoming HTTP Request")
+	log.Println("Incoming CMD message Request")
 
-	// peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-	// if err != nil {
-	// 	panic(err)
-	// }
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers:   msg.ICEServers,
 		SDPSemantics: webrtc.SDPSemanticsUnifiedPlanWithFallback,
@@ -147,10 +151,6 @@ func createPeerConnection(msg Message) {
 		panic(err)
 	}
 
-	// var offer webrtc.SessionDescription
-	// if err := json.NewDecoder(r.Body).Decode(&offer); err != nil {
-	// 	panic(err)
-	// }
 	offer := msg.RtcSession
 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
@@ -165,20 +165,9 @@ func createPeerConnection(msg Message) {
 	}
 	<-gatherComplete
 	req := &Session{}
-	req.Type = "answer"
-	req.DeviceId = config.Config.Mqtt.CLIENTID //"kvm1"
+	req.Type = CMDMSG_ANSWER
+	req.DeviceId = config.Config.Mqtt.CLIENTID
 
-	//data := signal.Encode(*peerConnection.LocalDescription())
-
-	// response, err := json.Marshal(peerConnection.LocalDescription())
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// w.Header().Set("Content-Type", "application/json")
-	// if _, err := w.Write(response); err != nil {
-	// 	panic(err)
-	// }
 	p := media_interface.Peer{}
 	p.InitPeer(msg.Suuid, msg.SeqID, "", "")
 	p.AddConnect(msg.Describestreamname, peerConnection)
@@ -189,10 +178,11 @@ func createPeerConnection(msg Message) {
 	if err != nil || s == nil {
 		resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
 		logger.Debugf("error %s no stream %s", msg.SeqID, resultstr)
-		req.Data = enc.Encode(resultstr)
+		req.Msg = resultstr
+		req.Type = CMDMSG_ERROR
 		answermsg := PublishMsg{
 			WEB_SEQID: msg.SeqID,
-			Topic:     "error",
+			Topic:     TOPIC_ERROR,
 			Msg:       req,
 		}
 		logger.Debugf("error %s", msg.SeqID)
@@ -202,10 +192,11 @@ func createPeerConnection(msg Message) {
 		if err != nil {
 			resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
 			logger.Debugf("error %s no stream %s", msg.SeqID, resultstr)
-			req.Data = enc.Encode(resultstr)
+			req.Msg = resultstr
+			req.Type = CMDMSG_ERROR
 			answermsg := PublishMsg{
 				WEB_SEQID: msg.SeqID,
-				Topic:     "error",
+				Topic:     TOPIC_ERROR,
 				Msg:       req,
 			}
 			logger.Debugf("error %s", msg.SeqID)
@@ -214,14 +205,13 @@ func createPeerConnection(msg Message) {
 			req.Data = enc.Encode(*peerConnection.LocalDescription())
 			answermsg := PublishMsg{
 				WEB_SEQID: msg.SeqID,
-				Topic:     "answer",
+				Topic:     TOPIC_ANSWER,
 				Msg:       req,
 			}
 			logger.Debugf("answer %s", msg.SeqID)
 			SendMsg(answermsg)
 		}
 	}
-	// go startRTMPServer(peerConnection, videoTrack, audioTrack)
 }
 
 func Notice(msg Message) {
@@ -235,16 +225,14 @@ func Notice(msg Message) {
 	default:
 		answermsg := PublishMsg{
 			WEB_SEQID: msg.SeqID,
-			Topic:     "refuse",
+			Topic:     TOPIC_REFUSE,
 			Msg:       "not supported mode" + msg.Mode,
 		}
 		logger.Debugf("answer %s", msg.SeqID)
 		SendMsg(answermsg) //response)
 
 	}
-	// go doSignalingMqtt(msg)
 
-	// go CaputureScreen(msg)
 }
 
 // handle is called when a message is received

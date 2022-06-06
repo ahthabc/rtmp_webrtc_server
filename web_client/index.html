@@ -11,7 +11,7 @@
         拉 流  名 称: <input type="text"  name="streamname" id="streamId" value="test"><button type="button"  onclick="endSession()" id="close_btn">停止拉流</button><br>
       </form>
     </div>
-    <div id="rtmpFeed"></div>
+    <div id="remote-video"></div>
     <!-- <div 
       <video controlsList="nodownload noplaybackrate nofullscreen noremoteplayback"
         disablePictureInPicture id="remote-video" autoplay class="m-0 p-0"
@@ -38,8 +38,13 @@
       </video>
     </div> -->
   </body>
+  <!-- <script> 
+
+  </script> -->
+  <!-- <script src="start.js"></script> -->
+  <!-- <script src="webrtc.js"></script>
+  <script src="mqtt.js"></script> -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/2.18.8/mqtt.min.js"></script> 
   <script src="start.js"></script>
-  <script src="webrtc.js"></script>
-  <script src="mqtt.js"></script>
-  <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/2.18.8/mqtt.min.js"></script>  
+
 </html>

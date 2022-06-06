@@ -10,10 +10,14 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	// "github.com/xiangxud/go-rtmp"
 	media_interface "github.com/xiangxud/rtmp_webrtc_server/media"
 	flvtag "github.com/yutopp/go-flv/tag"
 	"github.com/yutopp/go-rtmp"
+
+	// "github.com/yutopp/go-rtmp"
 	rtmpmsg "github.com/yutopp/go-rtmp/message"
+	// rtmpmsg "github.com/xiangxud/go-rtmp/message"
 	// opus "gopkg.in/hraban/opus.v2"
 )
 
@@ -82,7 +86,12 @@ func (h *Handler) OnPublish(timestamp uint32, cmd *rtmpmsg.NetStreamPublish) err
 	// s.InitVideo()
 	h.streamname = cmd.PublishingName
 	log.Println("current streamname:", h.streamname)
-	h.streammanager.AddStream(&s)
+	m := media_interface.GetGlobalStreamM()
+	err := m.AddStream(&s)
+	if err != nil {
+		log.Println("addstream error", err)
+		return err
+	}
 	return nil
 }
 
@@ -133,7 +142,7 @@ func (h *Handler) OnAudio(timestamp uint32, payload io.Reader) error {
 	if errs != nil {
 		var errstr string
 		for _, e := range errs {
-			errstr = errstr + fmt.Sprintf("%s", e.Error())
+			errstr = errstr + e.Error()
 		}
 		return fmt.Errorf("send audio error: %s", errstr)
 	}
@@ -207,4 +216,10 @@ func (h *Handler) OnVideo(timestamp uint32, payload io.Reader) error {
 
 func (h *Handler) OnClose() {
 	log.Printf("OnClose")
+	m := media_interface.GetGlobalStreamM()
+	err := m.DeleteStream(h.streamname)
+	if err != nil {
+		log.Println("addstream error", err)
+		//return err
+	}
 }

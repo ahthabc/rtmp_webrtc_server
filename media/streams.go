@@ -71,6 +71,7 @@ func (p *Peer) AddConnect(streamname string, pconn *webrtc.PeerConnection) {
 	p.peerConnection = pconn
 	p.startTime = time.Now()
 	p.streamName = streamname
+	p.status = PEER_CONNECT
 
 }
 func (p *Peer) AddAudioTrack(track *webrtc.TrackLocalStaticSample) {
@@ -80,6 +81,9 @@ func (p *Peer) AddVideoTrack(track *webrtc.TrackLocalStaticSample) {
 	p.videoTrack = track
 }
 func (p *Peer) SendPeerAudio(audiodata []byte) error {
+	if p.status != PEER_CONNECT {
+		return fmt.Errorf("peer is not connected,status %d", p.status)
+	}
 	log.Println("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
 	if audioErr := p.audioTrack.WriteSample(media.Sample{
 		Data:     audiodata,
@@ -91,6 +95,9 @@ func (p *Peer) SendPeerAudio(audiodata []byte) error {
 	return nil
 }
 func (p *Peer) SendPeerVideo(videodata []byte) error {
+	if p.status != PEER_CONNECT {
+		return fmt.Errorf("peer is not connected,status %d", p.status)
+	}
 	if vedioErr := p.videoTrack.WriteSample(media.Sample{
 		Data:     videodata,
 		Duration: time.Second / 30,
@@ -155,6 +162,8 @@ func (s *Stream) AddPeer(p *Peer) error {
 		return errors.New("peer is exsit")
 	}
 	if p.peerName != "" {
+		// p.status = PEER_CONNECT
+		// p.startTime = time.Now()
 		s.peers[p.peerName] = p
 		return nil
 	}
@@ -212,8 +221,17 @@ func (s *Stream) InitAudio(data []byte) error {
 	s.audioDecoder.InitRaw(data)
 	return nil
 }
+func (s *Stream) ReleaseAudio() {
+	s.audioDecoder.Close()
+	s.audioEncoder.Close()
+}
 func (s *Stream) SendStreamAudio(datas []byte) []error {
 	var errs []error
+	if s.audioDecoder == nil {
+		log.Println("decoder is released")
+		errs = append(errs, fmt.Errorf("decoder is released"))
+		return errs
+	}
 	pcm, err := s.audioDecoder.Decode(datas)
 	if err != nil {
 		log.Println("decode error: ", hex.EncodeToString(datas), err)
@@ -230,6 +248,11 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 		}
 		bufferSize := 1024
 		opusData := make([]byte, bufferSize)
+		if s.audioEncoder == nil {
+			log.Println("encoder is released")
+			errs = append(errs, fmt.Errorf("encoder is released"))
+			return errs
+		}
 		n, err := s.audioEncoder.Encode(pcm16, opusData)
 		// n, err := h.audioEncoder.ReadEncode(pcm16, opusData)
 		if err != nil {
@@ -297,16 +320,24 @@ func (m *StreamManager) AddStream(s *Stream) error {
 	}
 
 }
-func (m *StreamManager) DeleteStream(s *Stream) error {
-	if m.streams == nil || s == nil {
+func (m *StreamManager) DeleteStream(name string) error {
+	if m.streams == nil || name == "" {
 		return errors.New("stream is not exsit")
 	}
-	if s.streamName != "" {
-		delete(m.streams, s.streamName)
+	s := m.streams[name]
+
+	if s != nil {
+		s.status = STREAM_DEADLINE
+		go func() { //防止正在使用，先设置状态，然后延迟再删除，如果还有冲突，就先不删除，一般是在stream推流关闭时才调用一般不会出问题
+			time.Sleep(time.Duration(2) * time.Second)
+			s.ReleaseAudio()
+			delete(m.streams, name)
+		}()
 		return nil
 	} else {
 		return errors.New("stream is not exsit")
 	}
+
 }
 func (m *StreamManager) GetStream(streamname string) (*Stream, error) {
 	if m.streams == nil {
@@ -330,7 +361,11 @@ func (m *StreamManager) SetStream(name string, s *Stream) error {
 	}
 }
 
-var Global_StreamM StreamManager
+//全局变量
+var (
+	Global_StreamM        StreamManager
+	StreamPeersForConnect map[string]*Peer //不存在的流，考虑收到peer时通过mqtt命令向设备发起推流指令，比较好的策略是有客户端向设备询问是否在推流
+)
 
 func CreateGlobalStreamM() *StreamManager {
 	Global_StreamM.InitStreamManage()

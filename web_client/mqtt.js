@@ -1,5 +1,13 @@
 
 
+// function importScript(scriptUrl){
+//     var script= document.createElement("script");
+//     script.setAttribute("type", "text/javascript");
+//     script.setAttribute("src", scriptUrl);
+//     document.body.appendChild(script);
+// }
+
+
 function initMqtt() {
 
     var ClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8)

@@ -91,6 +91,11 @@ bridge_encoder_get_packet_loss_perc(OpusEncoder *st, opus_int32 *loss_perc)
 {
 	return opus_encoder_ctl(st, OPUS_GET_PACKET_LOSS_PERC(loss_perc));
 }
+void
+bridge_encoder_destroy(OpusEncoder *st)
+{
+	opus_encoder_destroy(st);
+}
 
 */
 import "C"
@@ -472,4 +477,13 @@ func (enc *Encoder) PacketLossPerc() (int, error) {
 		return 0, Error(res)
 	}
 	return int(lossPerc), nil
+}
+
+func (enc *Encoder) Close() error {
+	if enc.p == nil {
+		return nil
+	}
+	C.bridge_encoder_destroy(enc.p)
+	enc.p = nil
+	return nil
 }
