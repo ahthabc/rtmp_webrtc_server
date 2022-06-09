@@ -21,12 +21,14 @@ const (
 	PEER_INIT StreamState = iota
 	PEER_CONNECT
 	PEER_TIMEOUT
+	PEER_CLOSED
 	PEER_DEADLINE
 )
 const (
 	STREAM_INIT StreamState = iota
 	STREAM_CONNECT
 	STREAM_TIMEOUT
+	STREAM_CLOSED
 	STREAM_DEADLINE
 )
 
@@ -83,12 +85,15 @@ func (p *Peer) AddVideoTrack(track *webrtc.TrackLocalStaticSample) {
 }
 func (p *Peer) SendPeerAudio(audiodata []byte) error {
 	if p.status != PEER_CONNECT {
-		return fmt.Errorf("peer is not connected,status %d", p.status)
+		// return fmt.Errorf("peer is not connected,status %d", p.status)
+		// log.Println("SendPeerAudio peer ", p.peerName, " is not connected,status ", p.status)
+		return nil
 	}
 	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-		p.status = PEER_CONNECT
+		p.status = PEER_CLOSED
 		p.endTime = time.Now()
-		return fmt.Errorf("peer is closed,status %d", p.status)
+		log.Println("SendPeerAudio peer ", p.peerName, " is closed,status ", p.status)
+		return nil
 	}
 	if config.Config.Stream.Debug {
 		log.Println("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
@@ -104,12 +109,16 @@ func (p *Peer) SendPeerAudio(audiodata []byte) error {
 }
 func (p *Peer) SendPeerVideo(videodata []byte) error {
 	if p.status != PEER_CONNECT {
-		return fmt.Errorf("peer is not connected,status %d", p.status)
+		// return fmt.Errorf("peer is not connected,status %d", p.status)
+		// log.Println("SendPeerVideo peer ", p.peerName, " is not connected,status ", p.status)
+		return nil
 	}
 	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-		p.status = PEER_CONNECT
+		p.status = PEER_CLOSED
 		p.endTime = time.Now()
-		return fmt.Errorf("peer is closed,status %d", p.status)
+		// return fmt.Errorf("peer is closed,status %d", p.status)
+		log.Println("SendPeerVideo peer ", p.peerName, " is closed,status ", p.status)
+		return nil
 	}
 	if vedioErr := p.videoTrack.WriteSample(media.Sample{
 		Data:     videodata,
@@ -172,7 +181,7 @@ func (s *Stream) AddPeer(p *Peer) error {
 		s.peers = make(map[string]*Peer, 0)
 	}
 	if s.peers[p.peerName] != nil {
-		return errors.New("peer is exsit")
+		log.Println(p.peerName, " peer is exsit,reset peer")
 	}
 	if p.peerName != "" {
 		// p.status = PEER_CONNECT

@@ -53,17 +53,17 @@ func startRTMPServer(streammanager *media_interface.StreamManager) {
 	})
 
 	go func() {
-		log.Println("RTMP server starting...")
-		if err := srv.Serve(listener); err != nil {
-			log.Panicf("Failed: %+v", err)
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		<-sigs
+
+		if err = srv.Close(); err != nil {
+			log.Panic(err)
 		}
 	}()
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-
-	if err = srv.Close(); err != nil {
-		log.Panic(err)
+	log.Println("RTMP server starting...")
+	if err := srv.Serve(listener); err != nil {
+		log.Panicf("Failed: %+v", err)
 	}
 	log.Println("rtmp server exit")
 
@@ -161,6 +161,7 @@ func (h *Handler) OnAudio(timestamp uint32, payload io.Reader) error {
 			errstr = errstr + e.Error()
 		}
 		return fmt.Errorf("send audio error: %s", errstr)
+		// return nil
 	}
 	return nil
 

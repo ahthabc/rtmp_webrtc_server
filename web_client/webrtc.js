@@ -52,12 +52,21 @@ function initWebRTC() {
         };
         pc.ontrack = function (event) {
             console.log("ontrack", event.track.kind)
+            var video=document.getElementById('remote-video')
             var el = document.createElement(event.track.kind)
             el.srcObject = event.streams[0]
             el.autoplay = true
             el.controls = true
-      
             document.getElementById('remote-video').appendChild(el)
+            // if(event.track.kind==="video"){
+            //     if (video.length>0) {
+            //         videos[0]=el
+            //     }else{
+            //        document.getElementById('remote-video').appendChild(el)
+            //     }
+            // }else{
+                
+            // }
         //     if(event.track.kind==="video"){
 
         //         trackCache = event.track;
@@ -130,9 +139,10 @@ function initWebRTC() {
     }
     function endWebrtc() {
         bWebrtc = false;
-        var videos = document.getElementsByTagName("remote-video");
-        for (var i = 0; i < videos.length; i++) {
-            videos[i].pause();
-        }
         pc.close();
+        var videos = document.getElementById("remote-video");
+        var len=videos.childNodes.length
+        for (var i = 0; i < len; i++) {
+            videos.removeChild(videos.childNodes[0])
+        }
     }

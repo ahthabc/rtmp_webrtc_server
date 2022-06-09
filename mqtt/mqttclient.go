@@ -188,6 +188,7 @@ func createPeerConnection(msg Message) {
 		logger.Debugf("error %s", msg.SeqID)
 		SendMsg(answermsg)
 	} else {
+		// s.GetPeer(p.)
 		err = s.AddPeer(&p)
 		if err != nil {
 			resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
