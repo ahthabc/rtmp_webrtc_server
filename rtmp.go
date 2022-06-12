@@ -2,15 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"net"
-	"os"
-	"os/signal"
-	"syscall"
+	"time"
+
+	"github.com/xiangxud/rtmp_webrtc_server/log"
 
 	"github.com/pkg/errors"
 	// "github.com/xiangxud/go-rtmp"
@@ -24,17 +24,17 @@ import (
 	// opus "gopkg.in/hraban/opus.v2"
 )
 
-func startRTMPServer(streammanager *media_interface.StreamManager) {
-	log.Println("Starting RTMP Server")
+func startRTMPServer(ctx context.Context, streammanager *media_interface.StreamManager) {
+	log.Debug("Starting RTMP Server")
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":1935")
 	if err != nil {
-		log.Panicf("Failed: %+v", err)
+		log.Errorf("Failed: %+v", err)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		log.Panicf("Failed: %+v", err)
+		log.Errorf("Failed: %+v", err)
 	}
 
 	srv := rtmp.NewServer(&rtmp.ServerConfig{
@@ -53,19 +53,18 @@ func startRTMPServer(streammanager *media_interface.StreamManager) {
 	})
 
 	go func() {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-		<-sigs
 
+		<-ctx.Done()
+		streammanager.End()
 		if err = srv.Close(); err != nil {
-			log.Panic(err)
+			log.Error(err)
 		}
 	}()
-	log.Println("RTMP server starting...")
+	log.Debug("RTMP server starting...")
 	if err := srv.Serve(listener); err != nil {
-		log.Panicf("Failed: %+v", err)
+		log.Errorf("Failed: %+v", err)
 	}
-	log.Println("rtmp server exit")
+	log.Debug("rtmp server exit")
 
 }
 
@@ -80,18 +79,18 @@ func (h *Handler) OnServe(conn *rtmp.Conn) {
 }
 
 func (h *Handler) OnConnect(timestamp uint32, cmd *rtmpmsg.NetConnectionConnect) error {
-	log.Printf("OnConnect: %#v", cmd)
+	log.Debugf("OnConnect: %#v", cmd)
 	// h.audioClockRate = 48000
 	return nil
 }
 
 func (h *Handler) OnCreateStream(timestamp uint32, cmd *rtmpmsg.NetConnectionCreateStream) error {
-	log.Printf("OnCreateStream: %#v", cmd)
+	log.Debugf("OnCreateStream: %#v", cmd)
 	return nil
 }
 
 func (h *Handler) OnPublish(timestamp uint32, cmd *rtmpmsg.NetStreamPublish) error {
-	log.Printf("OnPublish: %#v", cmd)
+	log.Debugf("OnPublish: %#v", cmd)
 
 	if cmd.PublishingName == "" {
 		return errors.New("PublishingName is empty")
@@ -101,11 +100,11 @@ func (h *Handler) OnPublish(timestamp uint32, cmd *rtmpmsg.NetStreamPublish) err
 	// s.InitAudio()
 	// s.InitVideo()
 	h.streamname = cmd.PublishingName
-	log.Println("current streamname:", h.streamname)
+	log.Debug("current streamname:", h.streamname)
 	m := media_interface.GetGlobalStreamM()
 	err := m.AddStream(&s)
 	if err != nil {
-		log.Println("addstream error", err)
+		log.Debug("addstream error", err)
 		return err
 	}
 	return nil
@@ -123,36 +122,41 @@ func (h *Handler) OnAudio(timestamp uint32, payload io.Reader) error {
 		return err
 	}
 	if data.Len() <= 0 {
-		log.Println("no audio datas", timestamp, payload)
+		log.Debug("no audio datas", timestamp, payload)
 		return fmt.Errorf("no audio datas")
 	}
-	// log.Println("\r\ntimestamp->", timestamp, "\r\npayload->", payload, "\r\naudio data->", data.Bytes())
+	// log.Debug("\r\ntimestamp->", timestamp, "\r\npayload->", payload, "\r\naudio data->", data.Bytes())
 	datas := data.Bytes()
-	// log.Println("\r\naudio data len:", len(datas), "->") // hex.EncodeToString(datas))
+	// log.Debug("\r\naudio data len:", len(datas), "->") // hex.EncodeToString(datas))
 
 	stream, err := h.streammanager.GetStream(h.streamname)
 	if err != nil {
-		log.Println(err, "error Get current Stream ")
+		log.Debug(err, "error Get current Stream ")
 		return fmt.Errorf("can't initialize codec with %s", err.Error())
 	}
 	if audio.AACPacketType == flvtag.AACPacketTypeSequenceHeader {
-		log.Println("Created new codec ", hex.EncodeToString(datas))
+		log.Debug("Created new codec ", hex.EncodeToString(datas))
 
 		err := stream.InitAudio(datas)
 		if err != nil {
-			log.Println(err, "error initializing Audio")
+			log.Debug(err, "error initializing Audio")
 			return fmt.Errorf("can't initialize codec with %s", err.Error())
 		}
 		// err = stream.audioDecoder.InitRaw(datas)
 
 		if err != nil {
-			log.Println(err, "error initializing stream")
+			log.Debug(err, "error initializing stream")
 			return fmt.Errorf("can't initialize codec with %s", hex.EncodeToString(datas))
 		}
 
 		return nil
 	}
-
+	room, err := h.streammanager.GetRoom("")
+	if err != nil {
+		log.Debug(err, "error GetRoom")
+	} else {
+		room.TrackSendData(h.streamname, "audio", datas, 20)
+	}
 	errs := stream.SendStreamAudio(datas)
 
 	if errs != nil {
@@ -163,6 +167,7 @@ func (h *Handler) OnAudio(timestamp uint32, payload io.Reader) error {
 		return fmt.Errorf("send audio error: %s", errstr)
 		// return nil
 	}
+
 	return nil
 
 	// return nil
@@ -211,11 +216,18 @@ func (h *Handler) OnVideo(timestamp uint32, payload io.Reader) error {
 
 		offset += int(bufferLength)
 	}
+	room, err := h.streammanager.GetRoom("")
+	if err != nil {
+		log.Debug(err, "error GetRoom")
+	} else {
+		room.TrackSendData(h.streamname, "video", outBuf, time.Second/30)
+	}
 	stream, err := h.streammanager.GetStream(h.streamname)
 	if err != nil {
-		log.Println(err, "error Get current Stream ")
+		log.Debug(err, "error Get current Stream ")
 		return fmt.Errorf("can't initialize codec with %s", err.Error())
 	}
+
 	errs := stream.SendStreamVideo(outBuf)
 	if errs != nil {
 		var errstr string
@@ -224,6 +236,7 @@ func (h *Handler) OnVideo(timestamp uint32, payload io.Reader) error {
 		}
 		return fmt.Errorf("send video error: %s", errstr)
 	}
+
 	return nil
 	// return h.videoTrack.WriteSample(media.Sample{
 	// 	Data:     outBuf,
@@ -232,11 +245,11 @@ func (h *Handler) OnVideo(timestamp uint32, payload io.Reader) error {
 }
 
 func (h *Handler) OnClose() {
-	log.Printf("OnClose")
+	log.Debug("OnClose->", h.streamname)
 	m := media_interface.GetGlobalStreamM()
 	err := m.DeleteStream(h.streamname)
 	if err != nil {
-		log.Println("addstream error", err)
+		log.Debug("DeleteStream error", err)
 		//return err
 	}
 }

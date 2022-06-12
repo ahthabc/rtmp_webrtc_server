@@ -1,0 +1,10 @@
+媒体服务器
+rtmp推流至webrtc
+rtmp 推流至livekit
+livekit 视频会议
+
+livekit 获取token
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user" --room RTMP-50:9a:4c:3c:2d:b5 --valid-for "100h"
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user1" --room RTMP-50:9a:4c:3c:2d:b5 --valid-for "100h"
+
+2022-06-12

@@ -1,7 +1,7 @@
 package livekitserver
 
 import (
-	"fmt"
+	"context"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
+	// "github.com/xiangxud/rtmp_webrtc_server/config"
+	"github.com/xiangxud/rtmp_webrtc_server/log"
 
 	"github.com/livekit/protocol/logger"
 
@@ -26,7 +28,49 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
-func Livekit_server() {
+// func Livekit_server(ctx context.Context) error {
+// 	rand.Seed(time.Now().UnixNano())
+
+// 	memProfile := c.String("memprofile")
+
+// 	serverlogger.InitFromConfig(config.Config.Livekit.Config.Logging)
+
+// 	if memProfile != "" {
+// 		if f, err := os.Create(memProfile); err != nil {
+// 			return err
+// 		} else {
+// 			defer func() {
+// 				// run memory profile at termination
+// 				runtime.GC()
+// 				_ = pprof.WriteHeapProfile(f)
+// 				_ = f.Close()
+// 			}()
+// 		}
+// 	}
+
+// 	currentNode, err := routing.NewLocalNode(&config.Config.Livekit.Config)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	server, err := service.InitializeServer(&config.Config.Livekit.Config, currentNode)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// sigChan := make(chan os.Signal, 1)
+// 	// signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+// 	go func() {
+// 		// sig := <-sigChan
+// 		<-ctx.Done()
+// 		logger.Infow("exit requested, shutting down", "signal", sig)
+// 		server.Stop(false)
+// 	}()
+
+// 	return server.Start()
+// }
+func Livekit_server(ctx context.Context) {
 	app := &cli.App{
 		Name:        "livekit-server",
 		Usage:       "High performance WebRTC server",
@@ -138,9 +182,12 @@ func Livekit_server() {
 		Version: version.Version,
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		fmt.Println(err)
+	if err := app.RunContext(ctx, os.Args); err != nil {
+		log.Debug(err)
 	}
+	// if err := app.Run(os.Args); err != nil {
+	// 	log.Debug(err)
+	// }
 }
 
 func getConfig(c *cli.Context) (*config.Config, error) {

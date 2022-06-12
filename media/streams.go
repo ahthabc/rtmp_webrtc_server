@@ -1,17 +1,20 @@
 package media
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/Glimesh/go-fdkaac/fdkaac"
+	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/xiangxud/rtmp_webrtc_server/config"
+	"github.com/xiangxud/rtmp_webrtc_server/livekitclient"
+	"github.com/xiangxud/rtmp_webrtc_server/log"
 	opus "github.com/xiangxud/rtmp_webrtc_server/opus"
 )
 
@@ -86,23 +89,23 @@ func (p *Peer) AddVideoTrack(track *webrtc.TrackLocalStaticSample) {
 func (p *Peer) SendPeerAudio(audiodata []byte) error {
 	if p.status != PEER_CONNECT {
 		// return fmt.Errorf("peer is not connected,status %d", p.status)
-		// log.Println("SendPeerAudio peer ", p.peerName, " is not connected,status ", p.status)
+		// log.Debug("SendPeerAudio peer ", p.peerName, " is not connected,status ", p.status)
 		return nil
 	}
 	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
 		p.status = PEER_CLOSED
 		p.endTime = time.Now()
-		log.Println("SendPeerAudio peer ", p.peerName, " is closed,status ", p.status)
+		log.Debug("SendPeerAudio peer ", p.peerName, " is closed,status ", p.status)
 		return nil
 	}
 	if config.Config.Stream.Debug {
-		log.Println("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
+		log.Debug("SendPeerAudio peer name:", p.peerName, "stream name:", p.streamName, "opus len:", len(audiodata))
 	}
 	if audioErr := p.audioTrack.WriteSample(media.Sample{
 		Data:     audiodata,
 		Duration: 20 * time.Millisecond,
 	}); audioErr != nil {
-		log.Println("WriteSample err", audioErr)
+		log.Debug("WriteSample err", audioErr)
 		return fmt.Errorf("WriteSample err %s", audioErr)
 	}
 	return nil
@@ -110,21 +113,21 @@ func (p *Peer) SendPeerAudio(audiodata []byte) error {
 func (p *Peer) SendPeerVideo(videodata []byte) error {
 	if p.status != PEER_CONNECT {
 		// return fmt.Errorf("peer is not connected,status %d", p.status)
-		// log.Println("SendPeerVideo peer ", p.peerName, " is not connected,status ", p.status)
+		// log.Debug("SendPeerVideo peer ", p.peerName, " is not connected,status ", p.status)
 		return nil
 	}
 	if p.peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
 		p.status = PEER_CLOSED
 		p.endTime = time.Now()
 		// return fmt.Errorf("peer is closed,status %d", p.status)
-		log.Println("SendPeerVideo peer ", p.peerName, " is closed,status ", p.status)
+		log.Debug("SendPeerVideo peer ", p.peerName, " is closed,status ", p.status)
 		return nil
 	}
 	if vedioErr := p.videoTrack.WriteSample(media.Sample{
 		Data:     videodata,
 		Duration: time.Second / 30,
 	}); vedioErr != nil {
-		log.Println("WriteSample err", vedioErr)
+		log.Debug("WriteSample err", vedioErr)
 		return fmt.Errorf("WriteSample err %s", vedioErr)
 	}
 	return nil
@@ -149,18 +152,20 @@ type streamPeerinterface interface {
 
 //rtmp 流
 type Stream struct {
-	streamId       string
-	streamName     string
-	userName       string
-	passWord       string
-	status         StreamState
-	startTime      time.Time
-	endTime        time.Time
-	peers          map[string]*Peer
-	audioDecoder   *fdkaac.AacDecoder
-	audioEncoder   *opus.Encoder
-	audioBuffer    []byte
-	audioClockRate uint32
+	streamId               string
+	streamName             string
+	userName               string
+	passWord               string
+	status                 StreamState
+	startTime              time.Time
+	endTime                time.Time
+	peers                  map[string]*Peer
+	audioDecoder           *fdkaac.AacDecoder
+	audioEncoder           *opus.Encoder
+	audioBuffer            []byte
+	audioClockRate         uint32
+	room                   *lksdk.Room //for publish to livekit room ,first create room as streamname for livekit,then publish track to livekit
+	videoTrack, audioTrack *webrtc.TrackLocalStaticSample
 	streamPeerinterface
 }
 
@@ -181,7 +186,7 @@ func (s *Stream) AddPeer(p *Peer) error {
 		s.peers = make(map[string]*Peer, 0)
 	}
 	if s.peers[p.peerName] != nil {
-		log.Println(p.peerName, " peer is exsit,reset peer")
+		log.Debug(p.peerName, " peer is exsit,reset peer")
 	}
 	if p.peerName != "" {
 		// p.status = PEER_CONNECT
@@ -234,7 +239,7 @@ func (s *Stream) SetOpusCtl() {
 func (s *Stream) InitAudio(data []byte) error {
 	encoder, err := opus.NewEncoder(48000, 2, opus.AppAudio)
 	if err != nil {
-		log.Println(err.Error())
+		log.Debug(err.Error())
 		return err
 	}
 	s.audioEncoder = encoder
@@ -250,18 +255,18 @@ func (s *Stream) ReleaseAudio() {
 func (s *Stream) SendStreamAudio(datas []byte) []error {
 	var errs []error
 	if s.audioDecoder == nil {
-		log.Println("decoder is released")
+		log.Debug("decoder is released")
 		errs = append(errs, fmt.Errorf("decoder is released"))
 		return errs
 	}
 	pcm, err := s.audioDecoder.Decode(datas)
 	if err != nil {
-		log.Println("decode error: ", hex.EncodeToString(datas), err)
+		log.Debug("decode error: ", hex.EncodeToString(datas), err)
 		errs = append(errs, fmt.Errorf("decode error"))
 		return errs
 	}
 	if config.Config.Stream.Debug {
-		log.Println("\r\npcm len ", len(pcm), " ->") //, pcm)
+		log.Debug("\r\npcm len ", len(pcm), " ->") //, pcm)
 	}
 	blockSize := 960
 	for s.audioBuffer = append(s.audioBuffer, pcm...); len(s.audioBuffer) >= blockSize*4; s.audioBuffer = s.audioBuffer[blockSize*4:] {
@@ -273,7 +278,7 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 		bufferSize := 1024
 		opusData := make([]byte, bufferSize)
 		if s.audioEncoder == nil {
-			log.Println("encoder is released")
+			log.Debug("encoder is released")
 			errs = append(errs, fmt.Errorf("encoder is released"))
 			return errs
 		}
@@ -286,13 +291,13 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 		opusOutput := opusData[:n]
 		for pname, p := range s.peers {
 			if config.Config.Stream.Debug {
-				log.Println("peer ", pname)
+				log.Debug("peer ", pname)
 			}
 			if p.streamName == s.streamName {
 				//log.Printf(" send audio data ")
 				err := p.SendPeerAudio(opusOutput)
 				if err != nil {
-					log.Println("error", err)
+					log.Debug("error", err)
 					errs = append(errs, err)
 				}
 			}
@@ -306,11 +311,11 @@ func (s *Stream) SendStreamVideo(datas []byte) []error {
 	var errs []error
 	for pname, p := range s.peers {
 		if config.Config.Stream.Debug {
-			log.Println("peer ", pname)
+			log.Debug("peer ", pname)
 		}
 		if p.streamName == s.streamName {
 			if config.Config.Stream.Debug {
-				log.Printf(" send video data ")
+				log.Debug(" send video data ")
 			}
 			err := p.SendPeerVideo(datas)
 			if err != nil {
@@ -322,7 +327,7 @@ func (s *Stream) SendStreamVideo(datas []byte) []error {
 }
 
 type streamsinterface interface {
-	InitStreamManage()
+	InitStreamManage(ctx context.Context)
 	AddStream(*Stream) error
 	DeleteStream(*Stream) error
 	GetStream(string) (*Stream, error)
@@ -332,11 +337,34 @@ type streamsinterface interface {
 //流管理
 type StreamManager struct {
 	streams map[string]*Stream
+	room    *livekitclient.Room
 	streamsinterface
+	ctx context.Context
+	// livekitclient.Room
 }
 
-func (m *StreamManager) InitStreamManage() {
+func (m *StreamManager) InitStreamManage(ctx context.Context) {
 	m.streams = make(map[string]*Stream, 0)
+	m.ctx = ctx
+	m.room = livekitclient.NewRoom(ctx, &config.Config.Livekit.Token)
+	// sn, _ := identity.GetSN()
+	_, err := m.room.CreateliveKitRoom("RTMP-" + config.Config.Livekit.Token.Identity)
+	if err != nil {
+		log.Debug("room create failed: ", err)
+	} else {
+		//每个流发布时自动连接到房间
+		// //重试
+		// for i := 0; i < 10; i++ {
+		// 	err = m.room.ConnectRoom()
+		// 	if err != nil {
+		// 		log.Debug("room connect failed: ", err)
+		// 		time.Sleep(1 * time.Second)
+		// 	} else {
+		// 		log.Debug("room connect succeeded")
+		// 		break
+		// 	}
+		// }
+	}
 }
 func (m *StreamManager) AddStream(s *Stream) error {
 	if m.streams == nil || s == nil {
@@ -351,6 +379,9 @@ func (m *StreamManager) AddStream(s *Stream) error {
 			ss.startTime = time.Now()
 			ss.status = PEER_CONNECT
 		}
+
+		m.room.TrackPublished(s.streamName)
+
 		return nil
 	} else {
 		return errors.New("stream is not exsit")
@@ -365,6 +396,9 @@ func (m *StreamManager) DeleteStream(name string) error {
 
 	if s != nil {
 		s.status = STREAM_DEADLINE
+
+		m.room.TrackClose(s.streamName)
+
 		// go func() { //防止正在使用，先设置状态，然后延迟再删除，如果还有冲突，就先不删除，一般是在stream推流关闭时才调用一般不会出问题
 		// 	time.Sleep(time.Duration(2) * time.Second)
 		// 	s.ReleaseAudio()
@@ -386,6 +420,12 @@ func (m *StreamManager) GetStream(streamname string) (*Stream, error) {
 		return nil, errors.New("streamname is null")
 	}
 }
+func (m *StreamManager) GetRoom(roomname string) (*livekitclient.Room, error) {
+	if m.room == nil {
+		return nil, errors.New("room is not exsit")
+	}
+	return m.room, nil
+}
 func (m *StreamManager) SetStream(name string, s *Stream) error {
 	if m.streams == nil || s == nil {
 		return errors.New("stream is not exsit")
@@ -397,6 +437,9 @@ func (m *StreamManager) SetStream(name string, s *Stream) error {
 		return errors.New("streamname is null")
 	}
 }
+func (m *StreamManager) End() {
+	m.room.Close()
+}
 
 //全局变量
 var (
@@ -404,8 +447,8 @@ var (
 	StreamPeersForConnect map[string]*Peer //不存在的流，考虑收到peer时通过mqtt命令向设备发起推流指令，比较好的策略是有客户端向设备询问是否在推流
 )
 
-func CreateGlobalStreamM() *StreamManager {
-	Global_StreamM.InitStreamManage()
+func CreateGlobalStreamM(ctx context.Context) *StreamManager {
+	Global_StreamM.InitStreamManage(ctx)
 	return &Global_StreamM
 }
 func GetGlobalStreamM() *StreamManager {

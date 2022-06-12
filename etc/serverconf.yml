@@ -10,3 +10,17 @@ mqtt:
   hearttime: 30
 stream:
   debug: false
+livekit:
+  token:
+    create: true
+    join: true
+    admin: true
+    list: true
+    host: ws://192.168.0.18:7880
+    api_key: APINrg5cyLqPK3p
+    api_secret: yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe
+    identity: 
+    name:
+    room:
+    metadata:
+    valid_for:  

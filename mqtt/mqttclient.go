@@ -2,15 +2,13 @@ package mqtt
 
 // Connect to the broker, subscribe, and write messages received to a file
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	//"github.com/didi/nightingale/src/modules/agent/config"
@@ -18,9 +16,9 @@ import (
 	// "github.com/didi/nightingale/src/modules/agent/config"
 	// "github.com/didi/nightingale/src/modules/agent/kvm/utils"
 	// "github.com/didi/nightingale/src/modules/agent/report"
-	"github.com/toolkits/pkg/logger"
 	"github.com/xiangxud/rtmp_webrtc_server/config"
 	"github.com/xiangxud/rtmp_webrtc_server/identity"
+	"github.com/xiangxud/rtmp_webrtc_server/log"
 	media_interface "github.com/xiangxud/rtmp_webrtc_server/media"
 	enc "github.com/xiangxud/rtmp_webrtc_server/signal"
 
@@ -112,7 +110,7 @@ func SendMsg(msg PublishMsg) {
 
 // Add a single video track
 func createPeerConnection(msg Message) {
-	log.Println("Incoming CMD message Request")
+	log.Debug("Incoming CMD message Request")
 
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers:   msg.ICEServers,
@@ -125,12 +123,12 @@ func createPeerConnection(msg Message) {
 		if connectionState == webrtc.ICEConnectionStateDisconnected {
 			// atomic.AddInt64(&peerConnectionCount, -1)
 			if err := peerConnection.Close(); err != nil {
-				logger.Debug("peerConnection.Close error %v", err)
+				log.Debug("peerConnection.Close error %v", err)
 				return
 			}
-			logger.Debug("peerConnection.Closed")
+			log.Debug("peerConnection.Closed")
 		} else if connectionState == webrtc.ICEConnectionStateConnected {
-			logger.Debug("peerConnection.Connected ")
+			log.Debug("peerConnection.Connected ")
 			// atomic.AddInt64(&peerConnectionCount, 1)
 		}
 	})
@@ -177,7 +175,7 @@ func createPeerConnection(msg Message) {
 	s, err := m.GetStream(msg.Describestreamname)
 	if err != nil || s == nil {
 		resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
-		logger.Debugf("error %s no stream %s", msg.SeqID, resultstr)
+		log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
 		req.Msg = resultstr
 		req.Type = CMDMSG_ERROR
 		answermsg := PublishMsg{
@@ -185,14 +183,14 @@ func createPeerConnection(msg Message) {
 			Topic:     TOPIC_ERROR,
 			Msg:       req,
 		}
-		logger.Debugf("error %s", msg.SeqID)
+		log.Debugf("error %s", msg.SeqID)
 		SendMsg(answermsg)
 	} else {
 		// s.GetPeer(p.)
 		err = s.AddPeer(&p)
 		if err != nil {
 			resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
-			logger.Debugf("error %s no stream %s", msg.SeqID, resultstr)
+			log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
 			req.Msg = resultstr
 			req.Type = CMDMSG_ERROR
 			answermsg := PublishMsg{
@@ -200,7 +198,7 @@ func createPeerConnection(msg Message) {
 				Topic:     TOPIC_ERROR,
 				Msg:       req,
 			}
-			logger.Debugf("error %s", msg.SeqID)
+			log.Debugf("error %s", msg.SeqID)
 			SendMsg(answermsg)
 		} else {
 			req.Data = enc.Encode(*peerConnection.LocalDescription())
@@ -209,7 +207,7 @@ func createPeerConnection(msg Message) {
 				Topic:     TOPIC_ANSWER,
 				Msg:       req,
 			}
-			logger.Debugf("answer %s", msg.SeqID)
+			log.Debugf("answer %s", msg.SeqID)
 			SendMsg(answermsg)
 		}
 	}
@@ -229,7 +227,7 @@ func Notice(msg Message) {
 			Topic:     TOPIC_REFUSE,
 			Msg:       "not supported mode" + msg.Mode,
 		}
-		logger.Debugf("answer %s", msg.SeqID)
+		log.Debugf("answer %s", msg.SeqID)
 		SendMsg(answermsg) //response)
 
 	}
@@ -245,7 +243,7 @@ func (o *handler) handle(client mqtt.Client, msg mqtt.Message) {
 		fmt.Printf("Message could not be parsed (%s): %s", msg.Payload(), err)
 		return
 	}
-	fmt.Println(resp)
+	log.Debug(resp)
 	switch resp.Type {
 	case CMDMSG_OFFER:
 		enc.Decode(resp.Data, &m)
@@ -293,7 +291,7 @@ func CmdFeedBack(seqid string, cmdstr string, status int, err string, sid string
 		Topic:     "cmdFeedback",
 		Msg:       req,
 	}
-	fmt.Println("cmdFeedback", answermsg)
+	log.Debug("cmdFeedback", answermsg)
 	SendMsg(answermsg) //response)
 }
 func GetCurrentPath() string {
@@ -306,9 +304,9 @@ func GetCurrentPath() string {
 	return getwd
 }
 
-func StartMqtt() {
+func StartMqtt(ctx context.Context) {
 
-	fmt.Println("StartMqtt ...")
+	log.Debug("StartMqtt ...")
 	// Create a handler that will deal with incoming messages
 	h := NewHandler()
 	defer h.Close()
@@ -316,7 +314,7 @@ func StartMqtt() {
 	// Now we establish the connection to the mqtt broker
 	sn, err := identity.GetSN()
 	if err != nil {
-		fmt.Println("GetSN error", err.Error())
+		log.Debug("GetSN error", err.Error())
 	} else {
 		config.Config.Mqtt.CLIENTID = sn
 	}
@@ -324,7 +322,7 @@ func StartMqtt() {
 	//只定阅与自身相关的
 	config.Config.Mqtt.SUBTOPIC = config.Config.Mqtt.SUBTOPIC + "/" + config.Config.Mqtt.CLIENTID
 	config.Config.Mqtt.PUBTOPIC = config.Config.Mqtt.PUBTOPIC + "/" + config.Config.Mqtt.CLIENTID
-	fmt.Println("subtopic", config.Config.Mqtt.SUBTOPIC, "pubtopic", config.Config.Mqtt.PUBTOPIC)
+	log.Debug("subtopic", config.Config.Mqtt.SUBTOPIC, "pubtopic", config.Config.Mqtt.PUBTOPIC)
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(config.Config.Mqtt.SERVERADDRESS)
 	opts.SetClientID(config.Config.Mqtt.CLIENTID)
@@ -347,11 +345,11 @@ func StartMqtt() {
 
 	// Log events
 	opts.OnConnectionLost = func(cl mqtt.Client, err error) {
-		fmt.Println("connection lost")
+		log.Debug("connection lost")
 	}
 
 	opts.OnConnect = func(c mqtt.Client) {
-		fmt.Println("connection established")
+		log.Debug("connection established")
 
 		// Establish the subscription - doing this here means that it willSUB happen every time a connection is established
 		// (useful if opts.CleanSession is TRUE or the broker does not reliably store session data)
@@ -363,12 +361,12 @@ func StartMqtt() {
 			if t.Error() != nil {
 				fmt.Printf("ERROR SUBSCRIBING: %s\n", t.Error())
 			} else {
-				fmt.Println("subscribed to: ", config.Config.Mqtt.SUBTOPIC)
+				log.Debug("subscribed to: ", config.Config.Mqtt.SUBTOPIC)
 			}
 		}()
 	}
 	opts.OnReconnecting = func(mqtt.Client, *mqtt.ClientOptions) {
-		fmt.Println("attempting to reconnect")
+		log.Debug("attempting to reconnect")
 	}
 
 	//
@@ -383,7 +381,7 @@ func StartMqtt() {
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		panic(token.Error())
 	}
-	fmt.Println("Connection is up")
+	log.Debug("Connection is up")
 	done := make(chan struct{})
 
 	var wg sync.WaitGroup
@@ -399,14 +397,14 @@ func StartMqtt() {
 					panic(err)
 				}
 				//t := client.Publish(Config.Mqtt.PUBTOPIC+"/"+Config.Report.SN, Config.Mqtt.QOS, false, msg)
-				fmt.Println("mqtt:", config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic)
+				log.Debug("mqtt:", config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic)
 				t := client.Publish(config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic, config.Config.Mqtt.QOS, false, msg)
 				go func() {
 					_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
 					if t.Error() != nil {
 						fmt.Printf("msg PUBLISHING: %s\n", t.Error().Error())
 					} else {
-						//fmt.Println("msg PUBLISHING:", msg)
+						//log.Debug("msg PUBLISHING:", msg)
 					}
 				}()
 			case <-time.After(time.Second * time.Duration(config.Config.Mqtt.HEARTTIME)):
@@ -435,23 +433,19 @@ func StartMqtt() {
 					if t.Error() != nil {
 						fmt.Printf("ERROR PUBLISHING: %s\n", t.Error().Error())
 					} else {
-						//fmt.Println("HEART PUBLISHING: ", msg)
+						//log.Debug("HEART PUBLISHING: ", msg)
 					}
 				}()
 			case <-done:
-				fmt.Println("publisher done")
+				log.Debug("publisher done")
 				wg.Done()
 				return
 			}
 		}
 	}()
 	// Messages will be delivered asynchronously so we just need to wait for a signal to shutdown
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-	signal.Notify(sig, syscall.SIGTERM)
-
-	<-sig
-	fmt.Println("signal caught - exiting")
+	<-ctx.Done()
+	log.Debug("signal caught - exiting")
 	client.Disconnect(1000)
-	fmt.Println("mqtt shutdown complete")
+	log.Debug("mqtt shutdown complete")
 }

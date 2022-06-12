@@ -3,19 +3,26 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 
 	"github.com/spf13/viper"
 	"github.com/toolkits/pkg/file"
-
 	"github.com/xiangxud/rtmp_webrtc_server/identity"
+	"github.com/xiangxud/rtmp_webrtc_server/livekitclient"
 )
 
 type ConfigT struct {
-	Mqtt   mqttSection   `yaml:"mqtt" mapstructure:"mqtt"`
-	Stream streamSection `yaml:"stream" mapstructure:"stream"`
+	HTTP
+	Mqtt    mqttSection    `yaml:"mqtt" mapstructure:"mqtt"`
+	Stream  streamSection  `yaml:"stream" mapstructure:"stream"`
+	Livekit livekitSection `yaml:"livekit" mapstructure:"livekit"`
 }
 type streamSection struct {
 	Debug bool `yaml:"debug" mapstructure:"debug"`
+}
+type livekitSection struct {
+	Token livekitclient.Token `yaml:"token"`
+	// Config livekitconfig.Config `yaml:"config"`
 }
 type mqttSection struct {
 	SUBTOPIC      string `yaml:"subtopic" mapstructure:"subtopic"` //"topic1"
@@ -70,10 +77,13 @@ func Parse() error {
 	if ident == "" || ident == "127.0.0.1" {
 		return fmt.Errorf("identity[%s] invalid", ident)
 	}
-
+	c.HTTP = HTTP{ListenAddr: ":8080", CORS: true, mux: http.DefaultServeMux}
 	Endpoint = ident
 	Config = c
-
+	sn, err := identity.GetSN()
+	if err == nil {
+		Config.Livekit.Token.Identity = sn
+	}
 	return nil
 }
 

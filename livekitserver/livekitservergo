@@ -1,0 +1,64 @@
+package livekitserver
+
+import (
+	"context"
+	"math/rand"
+	"os"
+	"runtime"
+	"runtime/pprof"
+	"time"
+
+	"github.com/xiangxud/rtmp_webrtc_server/config"
+
+	"github.com/livekit/protocol/logger"
+
+	serverlogger "github.com/livekit/livekit-server/pkg/logger"
+	"github.com/livekit/livekit-server/pkg/routing"
+	"github.com/livekit/livekit-server/pkg/service"
+)
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
+func Livekit_server(ctx context.Context) error {
+	rand.Seed(time.Now().UnixNano())
+
+	memProfile := "tmp/livekitlog" //c.String("memprofile")
+
+	serverlogger.InitFromConfig(config.Config.Livekit.Config.Logging)
+
+	if memProfile != "" {
+		if f, err := os.Create(memProfile); err != nil {
+			return err
+		} else {
+			defer func() {
+				// run memory profile at termination
+				runtime.GC()
+				_ = pprof.WriteHeapProfile(f)
+				_ = f.Close()
+			}()
+		}
+	}
+
+	currentNode, err := routing.NewLocalNode(&config.Config.Livekit.Config)
+	if err != nil {
+		return err
+	}
+
+	server, err := service.InitializeServer(&config.Config.Livekit.Config, currentNode)
+	if err != nil {
+		return err
+	}
+
+	// sigChan := make(chan os.Signal, 1)
+	// signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		// sig := <-sigChan
+		<-ctx.Done()
+		logger.Infow("exit requested, shutting down", "signal", ctx.Value)
+		server.Stop(false)
+	}()
+
+	return server.Start()
+}

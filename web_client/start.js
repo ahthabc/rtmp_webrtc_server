@@ -6,6 +6,7 @@ function importScripts(scriptUrl){
   document.body.appendChild(script);
 }
 importScripts("./parameter.js")
+importScripts("./windows.js")
 importScripts("./mqtt.js")
 importScripts("./webrtc.js")
 
