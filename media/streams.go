@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Glimesh/go-fdkaac/fdkaac"
-	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/xiangxud/rtmp_webrtc_server/config"
@@ -123,12 +122,12 @@ func (p *Peer) SendPeerVideo(videodata []byte) error {
 		log.Debug("SendPeerVideo peer ", p.peerName, " is closed,status ", p.status)
 		return nil
 	}
-	if vedioErr := p.videoTrack.WriteSample(media.Sample{
+	if videoErr := p.videoTrack.WriteSample(media.Sample{
 		Data:     videodata,
 		Duration: time.Second / 30,
-	}); vedioErr != nil {
-		log.Debug("WriteSample err", vedioErr)
-		return fmt.Errorf("WriteSample err %s", vedioErr)
+	}); videoErr != nil {
+		log.Debug("WriteSample err", videoErr)
+		return fmt.Errorf("WriteSample err %s", videoErr)
 	}
 	return nil
 }
@@ -152,20 +151,21 @@ type streamPeerinterface interface {
 
 //rtmp 流
 type Stream struct {
-	streamId               string
-	streamName             string
-	userName               string
-	passWord               string
-	status                 StreamState
-	startTime              time.Time
-	endTime                time.Time
-	peers                  map[string]*Peer
-	audioDecoder           *fdkaac.AacDecoder
-	audioEncoder           *opus.Encoder
-	audioBuffer            []byte
-	audioClockRate         uint32
-	room                   *lksdk.Room //for publish to livekit room ,first create room as streamname for livekit,then publish track to livekit
-	videoTrack, audioTrack *webrtc.TrackLocalStaticSample
+	streamId       string
+	streamName     string
+	userName       string
+	passWord       string
+	status         StreamState
+	startTime      time.Time
+	endTime        time.Time
+	peers          map[string]*Peer
+	audioDecoder   *fdkaac.AacDecoder
+	audioEncoder   *opus.Encoder
+	audioBuffer    []byte
+	audioClockRate uint32
+	//room                   *lksdk.Room //for publish to livekit room ,first create room as streamname for livekit,then publish track to livekit
+	room *livekitclient.Room
+	// videoTrack, audioTrack *webrtc.TrackLocalStaticSample
 	streamPeerinterface
 }
 
@@ -289,6 +289,14 @@ func (s *Stream) SendStreamAudio(datas []byte) []error {
 			return errs
 		}
 		opusOutput := opusData[:n]
+		// m:=GetRoom
+		// room, err := h.streammanager.GetRoom("")
+		if s.room == nil {
+			log.Debug("stream room is null")
+		} else {
+			//960 48k 20ms/per
+			s.room.TrackSendData(s.streamName, "audio", opusOutput, 20*time.Millisecond)
+		}
 		for pname, p := range s.peers {
 			if config.Config.Stream.Debug {
 				log.Debug("peer ", pname)
@@ -351,20 +359,20 @@ func (m *StreamManager) InitStreamManage(ctx context.Context) {
 	_, err := m.room.CreateliveKitRoom("RTMP-" + config.Config.Livekit.Token.Identity)
 	if err != nil {
 		log.Debug("room create failed: ", err)
-	} else {
-		//每个流发布时自动连接到房间
-		// //重试
-		// for i := 0; i < 10; i++ {
-		// 	err = m.room.ConnectRoom()
-		// 	if err != nil {
-		// 		log.Debug("room connect failed: ", err)
-		// 		time.Sleep(1 * time.Second)
-		// 	} else {
-		// 		log.Debug("room connect succeeded")
-		// 		break
-		// 	}
-		// }
-	}
+	} //else {
+	//每个流发布时自动连接到房间
+	// //重试
+	// for i := 0; i < 10; i++ {
+	// 	err = m.room.ConnectRoom()
+	// 	if err != nil {
+	// 		log.Debug("room connect failed: ", err)
+	// 		time.Sleep(1 * time.Second)
+	// 	} else {
+	// 		log.Debug("room connect succeeded")
+	// 		break
+	// 	}
+	// }
+	//}
 }
 func (m *StreamManager) AddStream(s *Stream) error {
 	if m.streams == nil || s == nil {
@@ -374,6 +382,7 @@ func (m *StreamManager) AddStream(s *Stream) error {
 		// m.streams[s.streamName] = s
 		//原来存在这个源就直接改状态
 		if ss := m.streams[s.streamName]; ss == nil {
+			s.room = m.room
 			m.streams[s.streamName] = s
 		} else {
 			ss.startTime = time.Now()

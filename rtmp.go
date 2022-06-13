@@ -151,12 +151,13 @@ func (h *Handler) OnAudio(timestamp uint32, payload io.Reader) error {
 
 		return nil
 	}
-	room, err := h.streammanager.GetRoom("")
-	if err != nil {
-		log.Debug(err, "error GetRoom")
-	} else {
-		room.TrackSendData(h.streamname, "audio", datas, 20)
-	}
+	// room, err := h.streammanager.GetRoom("")
+	// if err != nil {
+	// 	log.Debug(err, "error GetRoom")
+	// } else {
+	// 	//960 48k 20ms/per
+	// 	room.TrackSendData(h.streamname, "audio", datas, 20*time.Millisecond)
+	// }
 	errs := stream.SendStreamAudio(datas)
 
 	if errs != nil {
