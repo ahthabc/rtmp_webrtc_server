@@ -8,8 +8,16 @@
 // }
 
 
+var t = Date.now();
+ 
+function sleep(d){
+	while(Date.now - t <= d);
+}
 function initMqtt() {
-
+    if(bmqttStarted){
+        console.log("mqtt is connect");
+        return;
+    }
     var ClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8)
     mqttclient = mqtt.connect(MqttServer,
         {
@@ -23,20 +31,28 @@ function initMqtt() {
                 //mqttclient.publish('Control', 'Hello mqtt')
                 //成功连接到服务器
                 console.log("connected to server");
-                initWebRTC();
+                bmqttStarted=true;
+                if(bUseWebrtcP2P)
+                   initWebRTC();
+                if(bSendCmdMsg){
+                    sendCmdMsg(cmd_topic,cmd_msgtype,cmd_deviceid,cmd_msg,cmd_cmdmsg);
+                }   
             }
         })
     })
     mqttclient.on('message', function (topic, message) {
         // message is Buffer
-        console.log(topic)
-        console.log(message)
+        console.log("topic:",topic)
+        console.log("message:",message)
 
         let input = JSON.parse(message)
-        console.log(input)
+        console.log("input:",input)
         switch (input.type) {
+            case 'offer': 
+              getRemoteOffer(input);
+              break;
             case "error":
-                console.log(input.msg);
+                console.log("msg:",input.msg);
                 stopSession();
                 break;
             case "answer":
@@ -45,8 +61,14 @@ function initMqtt() {
                     alert('Session Description must not be empty');
                 }
                 try {
-                    let answer = JSON.parse(atob(remoteSessionDescription));
-                    console.log(answer);
+                    let answerjsonstr=atob(remoteSessionDescription);
+                    console.log("atob1:",answerjsonstr);
+                    // answerjsonstr=answerjsonstr.substring(0,answerjsonstr.length-1);
+                    // console.log("atob2:",answerjsonstr);
+
+                    // let answer1 = answerjsonstr
+                    let answer = JSON.parse(answerjsonstr);
+                    console.log("answer:",answer);
                     // let answerjson=new RTCSessionDescription(answer);
                     // pc.setRemoteDescription(printAndReturnRemoteDescription(answer));
                     // pc.setRemoteDescription(printAndReturnRemoteDescription(answer));
@@ -76,5 +98,36 @@ function initMqtt() {
     })
 }
 function endMqtt() {
+    if(!bmqttStarted) return;
     mqttclient.end()
+    bmqttStarted=false;
+}
+
+function sendCmdMsg(topic,cmdmsgtype,deviceid,msg,cmdmsg){
+    // var msgdata = new Object();
+    //var localSessionDescription =btoa(JSON.stringify(pc.localDescription));
+    // while(!bmqttStarted){
+    //     console.log("mqtt 没链接");
+    //     sleep(1);
+    // }
+    // var timer = setInterval(function () {
+    // if(!bmqttStarted){
+    //     console.log("mqtt 没链接");
+    //     return;
+    // }
+    // clearTimeout(timer); //关闭定时器。
+    var content = new Object();
+    // /content[""]
+    content["type"] = cmdmsgtype;//CMDMSG_OFFER;
+    content["msg"] = msg;//"webrtc offer";
+    content["device_id"] =deviceid;//document.getElementById("serverId").value //$("#dropdown_menu_link").attr("value");
+    content["data"] = btoa(JSON.stringify(cmdmsg));
+    mqttclient.publish(topic, JSON.stringify(content));
+    console.log("mqttpublish:",topic, cmdmsg);
+    // },1000);
+
+    // console.log("mqttpublish:", btoa(JSON.stringify(content)));
+
+    //wsClient.send(JSON.stringify(content));
+    // console.log("localDescription:", btoa(JSON.stringify(pc.localDescription)));
 }

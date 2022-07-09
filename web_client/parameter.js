@@ -4,9 +4,11 @@ var WEB_SEQID;
 var suuid;
 var MqttServer = "ws://192.168.0.18:8083/mqtt";
 var SERVER_NAME="50:9a:4c:3c:2d:b5"//document.getElementById("serverId").value; 与服务器的SN配置结果一致，目前采用的是机器的mac地址
+var DEVICE_NAME="4E:7B:BF:71:D6:B4"
 if(SERVER_NAME===""){
     SERVER_NAME="50:9a:4c:3c:2d:b5";
 }
+
 function suuid() {
      
 	var s = [];
@@ -34,23 +36,57 @@ var subtopic = "server_cmd/" +SERVER_NAME+ "/"+ WEB_SEQID + "/#";//+"/"+deviceID
 var pubtopic = "server_control" + "/" + SERVER_NAME;
 let bVideo=true;
 let bAudio=true;
+var bmqttStarted=false; 
 var bWebrtc = false;
+var bUseWebrtcP2P =true;//启动webrtc p2p 模式
+var bSendCmdMsg = false;
+var bUseMesg=false; //发送cmd msg 
+var bDevicePull=false; //设备推流 true 客户端拉流false
+var cmd_topic;
+var cmd_msgtype;
+var cmd_deviceid;
+var cmd_msg;
+var cmd_cmdmsg;
+var controlDC;
+var bcontrolopen = false;
 const CMDMSG_OFFER = "offer"
+const CMDMSG_ANSWER = "answer"
 var STREAMNAME=document.getElementById("streamId").value;
 if(STREAMNAME===""){
-    STREAMNAME="test";
+    STREAMNAME="kvs";
 }
 let media_mode = "rtmp";
-var ICEServer = [
+// var ICEServer ={iceServers: [
+//     {
+//         urls: ["stun:192.168.0.18:3478"]
+//         // url: "stun:39.98.198.244:3478"
+//         //url:"stun:stun.l.google.com:19302"
+
+//     }, {
+//         urls: ["turn:192.168.0.18:3478"],
+//         // url: "turn:39.98.198.244:3478",
+//         username: "media",
+//         credential: "123456"
+//     }
+// ], sdpSemantics:'plan-b'};
+var ICEServer =[
     {
-        url: "stun:192.168.0.18:3478"
+        urls: ["stun:192.168.0.18:3478"]
         // url: "stun:39.98.198.244:3478"
         //url:"stun:stun.l.google.com:19302"
 
     }, {
-        url: "turn:192.168.0.18:3478",
+        urls: ["turn:192.168.0.18:3478"],
         // url: "turn:39.98.198.244:3478",
         username: "media",
         credential: "123456"
     }
 ];
+// var ICEServer = [
+//         {
+//             urls: "stun:stun.l.google.com:19302",
+//             // url: "stun:39.98.198.244:3478"
+//             //url:"stun:stun.l.google.com:19302"
+    
+//         }
+//     ];

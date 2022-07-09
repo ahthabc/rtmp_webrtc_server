@@ -1,0 +1,42 @@
+package COMMON
+
+import (
+	"github.com/pion/webrtc/v3"
+	"github.com/xiangxud/rtmp_webrtc_server/livekitclient"
+)
+
+type Session struct {
+	Type     string `json:"type"`
+	Msg      string `json:"msg"`
+	Data     string `json:"data"`
+	DeviceId string `json:"device_id"`
+}
+
+// type Pull_Stream_From_Device struct {
+// 	Pullfromdeviceid string                `json:"pullfrom"`   //客户端要求服务器拉流的设备标识 也是mqtt topic的唯一值向标识,允许批量
+// 	RoomToken        []livekitclient.Token `json:"room_token"` //客户端要求设备加入的房间信息，无此信息则沿用服务器默认的以自身sn创建的房间
+// }
+type Message struct {
+	SeqID                   string                                  `json:"seqid"`
+	Mode                    string                                  `json:"mode"`
+	Pull_Stream_From_Device []livekitclient.Pull_Stream_From_Device `json:"pull_stream_from_device"` //客户端要求的批量拉取设备流的列表
+	Video                   bool                                    `json:"video"`
+	Serial                  bool                                    `json:"serial"`
+	SSH                     bool                                    `json:"ssh"`
+	Audio                   bool                                    `json:"audio"`
+	ICEServers              []webrtc.ICEServer                      `json:"iceserver"`
+	RtcSession              webrtc.SessionDescription               `json:"offer" mapstructure:"offer"`
+	Describestreamname      string                                  `json:"streamname"`
+	Suuid                   string                                  `json:"suuid"` //视频流编号，浏览器可以通过预先获取，然后在使用时带过来，主要是提供一个选择分辨率和地址的作用，kvm的话内置4路分辨率，其余的如果是Onvif IPC类则通过Onvif协议在本地获取后通过mqtt传给浏览器，也可以考虑用探测软件实现探测后直接注册到夜莺平台，需要时前端到夜莺平台取
+}
+type ResponseMsg struct {
+	Cmdstr string
+	Status int
+	Err    string
+	Sid    string
+}
+type PublishMsg struct {
+	WEB_SEQID string
+	Topic     string
+	Msg       interface{}
+}

@@ -2,6 +2,7 @@ package log
 
 import (
 	// . "github.com/logrusorgru/aurora"
+	"fmt"
 	"io"
 	"os"
 
@@ -84,6 +85,18 @@ func Debug(args ...any) {
 	sugaredLogger.Debug(args...)
 }
 
+// func Debug(args ...any) {
+// 	sugaredLogger.Debug(args...)
+// }
+func InfoHex(datas []byte, len int) {
+	var hex, hexlogstr1 string
+
+	for ii := 0; ii < len; ii++ {
+		hex = fmt.Sprintf("0x%02x ", datas[ii])
+		hexlogstr1 += hex
+	}
+	Debug(hexlogstr1)
+}
 func Info(args ...any) {
 	sugaredLogger.Info(args...)
 }

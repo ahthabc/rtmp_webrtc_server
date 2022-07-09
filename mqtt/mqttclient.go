@@ -29,16 +29,24 @@ import (
 )
 
 const (
-	CMDMSG_OFFER      = "offer"
-	CMDMSG_ANSWER     = "answer"
-	CMDMSG_ERROR      = "error"
-	CMDMSG_STOPPEER   = "stoppeer"
-	CMDMSG_RESUMEPEER = "resumepeer"
-	CMDMSG_DELETEPEER = "deletepeer"
-	MODE_RTMP         = "rtmp"
-	TOPIC_ANSWER      = "answer"
-	TOPIC_ERROR       = "error"
-	TOPIC_REFUSE      = "refuse"
+	CMDMSG_OFFER                        = "offer"
+	CMDMSG_ANSWER                       = "answer"
+	CMDMSG_ERROR                        = "error"
+	CMDMSG_STOPPEER                     = "stoppeer"
+	CMDMSG_RESUMEPEER                   = "resumepeer"
+	CMDMSG_DELETEPEER                   = "deletepeer"
+	CMDMSG_SERVER_PULLSTREAMFROM_DEVICE = "serverpull" //由客户端告诉服务端向设备拉流
+	MODE_RTMP                           = "rtmp"
+	MODE_REQPULL                        = "reqpull"
+	MODE_DEVPUSH                        = "devpush"
+	MODE_ANSWER                         = "answer"
+	MODE_OFFER                          = "offer"
+	TOPIC_OFFER                         = "offer"
+	TOPIC_ANSWER                        = "answer"
+	TOPIC_REQPULL                       = "reqpull"
+	TOPIC_ERROR                         = "error"
+	TOPIC_REFUSE                        = "refuse"
+	DEVICE_CONTRL_TOPIC_PRE             = "device_control/"
 )
 
 var (
@@ -51,17 +59,24 @@ type Session struct {
 	Data     string `json:"data"`
 	DeviceId string `json:"device_id"`
 }
+
+// type Pull_Stream_From_Device struct {
+// 	Pullfromdeviceid string                `json:"pullfrom"`   //客户端要求服务器拉流的设备标识 也是mqtt topic的唯一值向标识,允许批量
+// 	RoomToken        []livekitclient.Token `json:"room_token"` //客户端要求设备加入的房间信息，无此信息则沿用服务器默认的以自身sn创建的房间
+// }
 type Message struct {
-	SeqID              string                    `json:"seqid"`
-	Mode               string                    `json:"mode"`
-	Video              bool                      `json:"video"`
-	Serial             bool                      `json:"serial"`
-	SSH                bool                      `json:"ssh"`
-	Audio              bool                      `json:"audio"`
-	ICEServers         []webrtc.ICEServer        `json:"iceserver"`
-	RtcSession         webrtc.SessionDescription `json:"offer" mapstructure:"offer"`
-	Describestreamname string                    `json:"streamname"`
-	Suuid              string                    `json:"suuid"` //视频流编号，浏览器可以通过预先获取，然后在使用时带过来，主要是提供一个选择分辨率和地址的作用，kvm的话内置4路分辨率，其余的如果是Onvif IPC类则通过Onvif协议在本地获取后通过mqtt传给浏览器，也可以考虑用探测软件实现探测后直接注册到夜莺平台，需要时前端到夜莺平台取
+	SeqID                   string                    `json:"seqid"`
+	Mode                    string                    `json:"mode"`
+	Pull_Stream_From_Device []Pull_Stream_From_Device `json:"pull_stream_from_device"` //客户端要求的批量拉取设备流的列表
+	Video                   bool                      `json:"video"`
+	Serial                  bool                      `json:"serial"`
+	SSH                     bool                      `json:"ssh"`
+	Audio                   bool                      `json:"audio"`
+	ICEServers              []webrtc.ICEServer        `json:"iceserver"`
+	RtcSession              webrtc.SessionDescription `json:"offer" mapstructure:"offer"`
+	Describestreamname      string                    `json:"streamname"`
+	Suuid                   string                    `json:"suuid"` //视频流编号，浏览器可以通过预先获取，然后在使用时带过来，主要是提供一个选择分辨率和地址的作用，kvm的话内置4路分辨率，其余的如果是Onvif IPC类则通过Onvif协议在本地获取后通过mqtt传给浏览器，也可以考虑用探测软件实现探测后直接注册到夜莺平台，需要时前端到夜莺平台取
+	Topicprefix             string                    `json:"topicprefix"`
 }
 type ResponseMsg struct {
 	Cmdstr string
@@ -73,6 +88,7 @@ type PublishMsg struct {
 	WEB_SEQID string
 	Topic     string
 	Msg       interface{}
+	BTodevice bool
 }
 type heartmsg struct {
 	Count uint64
@@ -80,6 +96,10 @@ type heartmsg struct {
 type handler struct {
 	f *os.File
 }
+
+var (
+	mqtt_ctx context.Context
+)
 
 func NewHandler() *handler {
 	var f *os.File
@@ -111,7 +131,27 @@ func SendMsg(msg PublishMsg) {
 // Add a single video track
 func createPeerConnection(msg Message) {
 	log.Debug("Incoming CMD message Request")
-
+	req := &Session{}
+	req.Type = CMDMSG_ANSWER
+	req.DeviceId = config.Config.Mqtt.CLIENTID
+	m := media_interface.GetGlobalStreamM()
+	s, err := m.GetStream(msg.Describestreamname)
+	if err != nil || s == nil {
+		resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
+		log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
+		req.Msg = resultstr
+		req.Type = CMDMSG_ERROR
+		answermsg := PublishMsg{
+			WEB_SEQID: msg.SeqID,
+			Topic:     TOPIC_ERROR,
+			Msg:       req,
+		}
+		log.Debugf("error %s", msg.SeqID)
+		SendMsg(answermsg)
+		return
+	}
+	p := media_interface.Peer{}
+	p.InitPeer(msg.Suuid, msg.SeqID, "", "")
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers:   msg.ICEServers,
 		SDPSemantics: webrtc.SDPSemanticsUnifiedPlanWithFallback,
@@ -132,21 +172,61 @@ func createPeerConnection(msg Message) {
 			// atomic.AddInt64(&peerConnectionCount, 1)
 		}
 	})
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
-	if err != nil {
-		panic(err)
-	}
-	if _, err = peerConnection.AddTrack(videoTrack); err != nil {
-		panic(err)
-	}
+	if s.IsRtpStream() {
+		videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+		if err != nil {
+			panic(err)
+		}
+		if _, err = peerConnection.AddTrack(videoRTPTrack); err != nil {
+			panic(err)
+		}
 
-	// audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMA}, "audio", "pion")
-	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
-	if err != nil {
-		panic(err)
+		// audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMA}, "audio", "pion")
+		audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
+		if err != nil {
+			panic(err)
+		}
+		if _, err = peerConnection.AddTrack(audioRTPTrack); err != nil {
+			panic(err)
+		}
+		p.AddConnect(msg.Describestreamname, peerConnection)
+		p.AddAudioRTPTrack(audioRTPTrack)
+		p.AddVideoRTPTrack(videoRTPTrack)
+	} else {
+		videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+		if err != nil {
+			panic(err)
+		}
+		if _, err = peerConnection.AddTrack(videoTrack); err != nil {
+			panic(err)
+		}
+
+		// audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMA}, "audio", "pion")
+		audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
+		if err != nil {
+			panic(err)
+		}
+		if _, err = peerConnection.AddTrack(audioTrack); err != nil {
+			panic(err)
+		}
+
+		p.AddConnect(msg.Describestreamname, peerConnection)
+		p.AddAudioTrack(audioTrack)
+		p.AddVideoTrack(videoTrack)
 	}
-	if _, err = peerConnection.AddTrack(audioTrack); err != nil {
-		panic(err)
+	err = s.AddPeer(&p)
+	if err != nil {
+		resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
+		log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
+		req.Msg = resultstr
+		req.Type = CMDMSG_ERROR
+		answermsg := PublishMsg{
+			WEB_SEQID: msg.SeqID,
+			Topic:     TOPIC_ERROR,
+			Msg:       req,
+		}
+		log.Debugf("error %s", msg.SeqID)
+		SendMsg(answermsg)
 	}
 
 	offer := msg.RtcSession
@@ -162,55 +242,16 @@ func createPeerConnection(msg Message) {
 		panic(err)
 	}
 	<-gatherComplete
-	req := &Session{}
-	req.Type = CMDMSG_ANSWER
-	req.DeviceId = config.Config.Mqtt.CLIENTID
 
-	p := media_interface.Peer{}
-	p.InitPeer(msg.Suuid, msg.SeqID, "", "")
-	p.AddConnect(msg.Describestreamname, peerConnection)
-	p.AddAudioTrack(audioTrack)
-	p.AddVideoTrack(videoTrack)
-	m := media_interface.GetGlobalStreamM()
-	s, err := m.GetStream(msg.Describestreamname)
-	if err != nil || s == nil {
-		resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
-		log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
-		req.Msg = resultstr
-		req.Type = CMDMSG_ERROR
-		answermsg := PublishMsg{
-			WEB_SEQID: msg.SeqID,
-			Topic:     TOPIC_ERROR,
-			Msg:       req,
-		}
-		log.Debugf("error %s", msg.SeqID)
-		SendMsg(answermsg)
-	} else {
-		// s.GetPeer(p.)
-		err = s.AddPeer(&p)
-		if err != nil {
-			resultstr := fmt.Sprintf("no stream %s", msg.Describestreamname)
-			log.Debugf("error %s no stream %s", msg.SeqID, resultstr)
-			req.Msg = resultstr
-			req.Type = CMDMSG_ERROR
-			answermsg := PublishMsg{
-				WEB_SEQID: msg.SeqID,
-				Topic:     TOPIC_ERROR,
-				Msg:       req,
-			}
-			log.Debugf("error %s", msg.SeqID)
-			SendMsg(answermsg)
-		} else {
-			req.Data = enc.Encode(*peerConnection.LocalDescription())
-			answermsg := PublishMsg{
-				WEB_SEQID: msg.SeqID,
-				Topic:     TOPIC_ANSWER,
-				Msg:       req,
-			}
-			log.Debugf("answer %s", msg.SeqID)
-			SendMsg(answermsg)
-		}
+	req.Data = enc.Encode(*peerConnection.LocalDescription())
+	answermsg := PublishMsg{
+		WEB_SEQID: msg.SeqID,
+		Topic:     TOPIC_ANSWER,
+		Msg:       req,
 	}
+	log.Debugf("answer %s", msg.SeqID)
+	SendMsg(answermsg)
+
 }
 
 func Notice(msg Message) {
@@ -218,9 +259,14 @@ func Notice(msg Message) {
 	switch msg.Mode {
 
 	case MODE_RTMP:
-
 		go createPeerConnection(msg)
-
+	case MODE_REQPULL:
+		go DevicePullStream(msg)
+	case MODE_DEVPUSH:
+		go DevicePublishStream(msg)
+	case MODE_ANSWER:
+		fmt.Println("get answer", msg)
+		SDPCh <- &msg
 	default:
 		answermsg := PublishMsg{
 			WEB_SEQID: msg.SeqID,
@@ -248,6 +294,18 @@ func (o *handler) handle(client mqtt.Client, msg mqtt.Message) {
 	case CMDMSG_OFFER:
 		enc.Decode(resp.Data, &m)
 		Notice(m)
+	case CMDMSG_SERVER_PULLSTREAMFROM_DEVICE: //收到客户端要求拉流的消息
+		enc.Decode(resp.Data, &m)
+		Notice(m)
+	case CMDMSG_ANSWER:
+
+		enc.Decode(resp.Data, &m.RtcSession)
+		m.Mode = MODE_ANSWER
+		Notice(m)
+	case CMDMSG_ERROR:
+		var errstr string
+		enc.DecodeBase64(resp.Data, &errstr)
+		log.Debug("error", errstr)
 	default:
 
 	}
@@ -307,6 +365,7 @@ func GetCurrentPath() string {
 func StartMqtt(ctx context.Context) {
 
 	log.Debug("StartMqtt ...")
+	mqtt_ctx = ctx
 	// Create a handler that will deal with incoming messages
 	h := NewHandler()
 	defer h.Close()
@@ -320,7 +379,7 @@ func StartMqtt(ctx context.Context) {
 	}
 
 	//只定阅与自身相关的
-	config.Config.Mqtt.SUBTOPIC = config.Config.Mqtt.SUBTOPIC + "/" + config.Config.Mqtt.CLIENTID
+	config.Config.Mqtt.SUBTOPIC = config.Config.Mqtt.SUBTOPIC + "/" + config.Config.Mqtt.CLIENTID + "/#"
 	config.Config.Mqtt.PUBTOPIC = config.Config.Mqtt.PUBTOPIC + "/" + config.Config.Mqtt.CLIENTID
 	log.Debug("subtopic", config.Config.Mqtt.SUBTOPIC, "pubtopic", config.Config.Mqtt.PUBTOPIC)
 	opts := mqtt.NewClientOptions()
@@ -361,7 +420,7 @@ func StartMqtt(ctx context.Context) {
 			if t.Error() != nil {
 				fmt.Printf("ERROR SUBSCRIBING: %s\n", t.Error())
 			} else {
-				log.Debug("subscribed to: ", config.Config.Mqtt.SUBTOPIC)
+				log.Debug("\r\nsubscribed to: ", config.Config.Mqtt.SUBTOPIC)
 			}
 		}()
 	}
@@ -392,21 +451,62 @@ func StartMqtt(ctx context.Context) {
 
 			select {
 			case data := <-msgChans:
+				deviceid := data.Msg.(*Session).DeviceId
 				msg, err := json.Marshal(data.Msg)
 				if err != nil {
 					panic(err)
 				}
-				//t := client.Publish(Config.Mqtt.PUBTOPIC+"/"+Config.Report.SN, Config.Mqtt.QOS, false, msg)
-				log.Debug("mqtt:", config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic)
-				t := client.Publish(config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic, config.Config.Mqtt.QOS, false, msg)
-				go func() {
-					_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
-					if t.Error() != nil {
-						fmt.Printf("msg PUBLISHING: %s\n", t.Error().Error())
+
+				if data.Topic == TOPIC_REQPULL {
+					// Establish the subscription - doing this here means that it willSUB happen every time a connection is established
+					// (useful if opts.CleanSession is TRUE or the broker does not reliably store session data)
+					// t := client.Subscribe(DEVICE_CONTRL_TOPIC_PRE+data.WEB_SEQID+"/"+MODE_DEVPUSH, config.Config.Mqtt.QOS, h.handle)
+					// // the connection handler is called in a goroutine so blocking here would hot cause an issue. However as blocking
+					// // in other handlers does cause problems its best to just assume we should not block
+					// go func() {
+					// 	_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
+					// 	if t.Error() != nil {
+					// 		fmt.Printf("ERROR SUBSCRIBING: %s\n", t.Error())
+					// 	} else {
+					// 		log.Debug("subscribed to: ", config.Config.Mqtt.SUBTOPIC)
+					// 	}
+					// }()
+					log.Debug("mqtt:", DEVICE_CONTRL_TOPIC_PRE+deviceid+"/"+data.Topic)
+					t1 := client.Publish(DEVICE_CONTRL_TOPIC_PRE+deviceid+"/"+data.Topic, config.Config.Mqtt.QOS, false, msg)
+					go func() {
+						_ = t1.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
+						if t1.Error() != nil {
+							fmt.Printf("msg PUBLISHING: %s\n", t1.Error().Error())
+						} else {
+							//log.Debug("msg PUBLISHING:", msg)
+						}
+					}()
+				} else {
+					//t := client.Publish(Config.Mqtt.PUBTOPIC+"/"+Config.Report.SN, Config.Mqtt.QOS, false, msg)
+					if data.BTodevice {
+						log.Debug("mqtt:", DEVICE_CONTRL_TOPIC_PRE+deviceid+"/"+data.Topic)
+						t1 := client.Publish(DEVICE_CONTRL_TOPIC_PRE+deviceid+"/"+data.Topic, config.Config.Mqtt.QOS, false, msg)
+						go func() {
+							_ = t1.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
+							if t1.Error() != nil {
+								fmt.Printf("msg PUBLISHING: %s\n", t1.Error().Error())
+							} else {
+								//log.Debug("msg PUBLISHING:", msg)
+							}
+						}()
 					} else {
-						//log.Debug("msg PUBLISHING:", msg)
+						log.Debug("mqtt:", config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic)
+						t := client.Publish(config.Config.Mqtt.PUBTOPIC+"/"+data.WEB_SEQID+"/"+data.Topic, config.Config.Mqtt.QOS, false, msg)
+						go func() {
+							_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
+							if t.Error() != nil {
+								fmt.Printf("msg PUBLISHING: %s\n", t.Error().Error())
+							} else {
+								//log.Debug("msg PUBLISHING:", msg)
+							}
+						}()
 					}
-				}()
+				}
 			case <-time.After(time.Second * time.Duration(config.Config.Mqtt.HEARTTIME)):
 				req := &Session{}
 				req.Type = "heart"

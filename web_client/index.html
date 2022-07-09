@@ -8,9 +8,15 @@
     <div class="row">
       <form action="demo_form.html" method="get">
         服务器名称: <input type="text"  name="servername" id="serverId" value="rtmpserver1"><button type="button" onclick="startSession()" id="connection_btn">开始拉流 </button><br>
-        拉 流  名 称: <input type="text"  name="streamname" id="streamId" value="test"><button type="button"  onclick="endSession()" id="close_btn">停止拉流</button><button type="button"  onclick="FullScreen()" id="fullscreen_btn">全  屏</button><br>
+        拉 流  名 称: <input type="text"  name="streamname" id="streamId" value="kvs"><button type="button"  onclick="endSession()" id="close_btn">停止拉流</button><br>
+        设 备  名 称: <input type="text"  name="devicename" id="deviceId" value="4E:7B:BF:71:D6:B4"><button type="button"  onclick="startDeviceSession()" id="startdevicesession_btn">p2p设备拉流</button><button type="button"  onclick="startDevicePull()" id="startdevicepull_btn">p2p设备推流</button><button type="button"  onclick="startDevicetoLivekit()" id="startdevicetolivekit_btn">设备推流至视频会议</button>
+        <button type="button"  onclick="FullScreen()" id="fullscreen_btn">全  屏</button><br>
+        数 据  发 送：<input type="text"  name="msgout" id="controlInput"  value="msgout"><button type="button"  onclick="controlSend()" id="control-send">发送控制消息</button><br>
+        数 据  接 收：<input type="text"  name="msgin" id="control_output"  value="msgin"><br>
       </form>
+
     </div>
+
     <div id="remote-video"></div>
     <!-- <div 
       <video controlsList="nodownload noplaybackrate nofullscreen noremoteplayback"

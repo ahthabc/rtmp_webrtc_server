@@ -4,7 +4,228 @@ rtmp 推流至livekit
 livekit 视频会议
 
 livekit 获取token
-./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user" --room RTMP-50:9a:4c:3c:2d:b5 --valid-for "100h"
-./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user1" --room RTMP-50:9a:4c:3c:2d:b5 --valid-for "100h"
-
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user" --room 50:9a:4c:3c:2d:b5 --valid-for "10000h"
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user1" --room 50:9a:4c:3c:2d:b5 --valid-for "10000h"
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user1" --room device_1 --valid-for "1000h"
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NTkzOTk5MDcsImlzcyI6IkFQSU5yZzVjeUxxUEszcCIsIm5hbWUiOiJ1c2VyMSIsIm5iZiI6MTY1NTc5OTkwNywic3ViIjoidXNlcjEiLCJ2aWRlbyI6eyJyb29tIjoiZGV2aWNlXzEiLCJyb29tQ3JlYXRlIjp0cnVlLCJyb29tSm9pbiI6dHJ1ZSwicm9vbUxpc3QiOnRydWV9fQ.tLsKXLyKOG1oDofgqCKm3lY8Kxi_lVe_b9gd1z33Ths
 2022-06-12
+
+./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user1" --room test --valid-for "1000h"
+2022-06-22
+webrtc服务器转发学习
+https://flashphoner.com/server-to-server-webrtc/
+https://github.com/pion/webrtc/discussions
+WebRTC H.264 编码的 Profile 和 Level
+https://blog.piasy.com/2020/01/04/WebRTC-H264-Profile-Levels/index.html
+SDP Profile-level-id解析
+https://blog.csdn.net/liang12360640/article/details/52096499
+
+rtp h264 包格式详解
+https://www.jianshu.com/p/c58678860da1
+https://blog.csdn.net/BERLIN23/article/details/107186184/
+https://zhuanlan.zhihu.com/p/402346767
+  +---------------+
+  |0|1|2|3|4|5|6|7|
+  +-+-+-+-+-+-+-+-+
+  |F|NRI|  Type   |
+  +---------------+
+F: 1 个比特.
+
+forbidden_zero_bit. 在 H.264 规范中规定了这一位必须为 0.
+
+NRI: 2 个比特.
+
+nal_ref_idc. 取 00 ~ 11, 似乎指示这个 NALU 的重要性, 如 00 的 NALU 解码器可以丢弃它而不影响图像的回放. 不过一般情况下不太关心;
+
+Type: 5 个比特
+
+nal_unit_type. 这个 NALU 单元的类型. 简述如下:
+
+0 没有定义
+
+1-23 NAL单元 单个 NAL 单元包.
+
+24 STAP-A 单一时间的组合包
+
+25 STAP-B 单一时间的组合包
+
+26 MTAP16 多个时间的组合包
+
+27 MTAP24 多个时间的组合包
+
+28 FU-A 分片的单元
+
+29 FU-B 分片的单元
+
+30-31 没有定义
+
+RTP 头的结构
+    负载类型 Payload type (PT): 7 bits
+    序列号 Sequence number (SN): 16 bits
+    时间戳 Timestamp: 32 bits
+0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |V=2|P|X|  CC   |M|     PT      |       sequence number         |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           timestamp                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |           synchronization source (SSRC) identifier            |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |            contributing source (CSRC) identifiers             |
+      |                             ....                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+H.264 Payload 格式定义了三种不同的基本的负载(Payload)结构. 接收端可能通过 RTP Payload
+的第一个字节来识别它们. 这一个字节类似 NALU 头的格式, 而这个头结构的 NAL 单元类型字段
+则指出了代表的是哪一种结构,这个字节的结构如下, 可以看出它和 H.264 的 NALU 头结构是一样的.
+      +---------------+
+      |0|1|2|3|4|5|6|7|
+      +-+-+-+-+-+-+-+-+
+      |F|NRI|  Type   |
+      +---------------+
+字段 Type: 这个 RTP payload 中 NAL 单元的类型.
+
+这个字段和 H.264 中类型字段的区别是, 当 type的值为 24 ~ 31 表示这是一个特别格式的 NAL 单元, 而 H.264 中, 只取 1~23 是有效的值      
+  24    STAP-A   单一时间的组合包
+  25    STAP-B   单一时间的组合包
+  26    MTAP16   多个时间的组合包
+  27    MTAP24   多个时间的组合包
+  28    FU-A     分片的单元
+  29    FU-B     分片的单元
+  30-31 没有定义
+单一 NAL 单元模式
+
+即一个 RTP 包仅由一个完整的 NALU 组成. 这种情况下 RTP NAL 头类型字段和原始的 H.264的
+NALU 头类型字段是一样的.
+
+组合封包模式
+
+即可能是由多个 NAL 单元组成一个 RTP 包. 分别有4种组合方式: STAP-A, STAP-B, MTAP16, MTAP24.
+
+那么这里的类型值分别是 24, 25, 26 以及 27.
+
+分片封包模式
+
+用于把一个 NALU 单元封装成多个 RTP 包. 存在两种类型 FU-A 和 FU-B. 类型值分别是 28 和 29.
+单一 NAL 单元模式
+
+
+  对于 NALU 的长度小于 MTU 大小的包, 一般采用单一 NAL 单元模式.
+对于一个原始的 H.264 NALU 单元常由 [Start Code] [NALU Header] [NALU Payload] 三部分组成, 其中 Start Code 用于标示这是一个
+
+
+  NALU 单元的开始, 必须是 “00 00 00 01” 或 “00 00 01”, NALU 头仅一个字节, 其后都是 NALU 单元内容.
+
+  打包时去除 “00 00 01” 或 “00 00 00 01” 的开始码, 把其他数据封包的 RTP 包即可.
+
+0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |F|NRI|  type   |                                               |
+      +-+-+-+-+-+-+-+-+                                               |
+      |                                                               |
+      |               Bytes 2..n of a Single NAL unit                 |
+      |                                                               |
+      |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                               :...OPTIONAL RTP padding        |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+例子：
+
+如有一个 H.264 的 NALU 是这样的:
+
+[00 00 00 01 67 42 A0 1E 23 56 0E 2F … ]
+
+这是一个序列参数集 NAL 单元. [00 00 00 01] 是四个字节的开始码, 67 是 NALU 头, 42 开始的数据是 NALU 内容.
+
+封装成 RTP 包将如下:
+
+[ RTP Header ] [ 67 42 A0 1E 23 56 0E 2F ]
+
+即只要去掉 4 个字节的开始码就可以了.
+
+
+组合封包模式
+
+其次, 当 NALU 的长度特别小时, 可以把几个 NALU 单元封在一个 RTP 包中.
+0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                          RTP Header                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |STAP-A NAL HDR |         NALU 1 Size           | NALU 1 HDR    |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         NALU 1 Data                           |
+      :                                                               :
+      +               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |               | NALU 2 Size                   | NALU 2 HDR    |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         NALU 2 Data                           |
+      :                                                               :
+      |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                               :...OPTIONAL RTP padding        |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Fragmentation Units (FUs)
+
+
+  而当 NALU 的长度超过 MTU 时, 就必须对 NALU 单元进行分片封包. 也称为 Fragmentation Units (FUs).
+
+
+0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      | FU indicator  |   FU header   |                               |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
+      |                                                               |
+      |                         FU payload                            |
+      |                                                               |
+      |                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                               :...OPTIONAL RTP padding        |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+      Figure 14.  RTP payload format for FU-A
+
+   The FU indicator octet has the following format:
+
+      +---------------+
+      |0|1|2|3|4|5|6|7|
+      +-+-+-+-+-+-+-+-+
+      |F|NRI|  Type   |
+      +---------------+
+
+   The FU header has the following format:
+
+      +---------------+
+      |0|1|2|3|4|5|6|7|
+      +-+-+-+-+-+-+-+-+
+      |S|E|R|  Type   |
+      +---------------+
+S: 1 bit 当设置成1,开始位指示分片NAL单元的开始。当跟随的FU荷载不是分片NAL单元荷载的开始，开始位设为0。
+
+E: 1 bit 当设置成1, 结束位指示分片NAL单元的结束，即, 荷载的最后字节也是分片NAL单元的最后一个字节。
+当跟随的FU荷载不是分片NAL单元的最后分片,结束位设置为0。
+
+R: 1 bit
+保留位必须设置为0，接收者必须忽略该位。
+
+Type: 5 bits
+此处的Type就是NALU头中的Type,取1-23的那个值，表示 NAL单元荷载类型定义。
+
+原始的NAL头的前三位为FU indicator的前三位，原始的NAL头的后五位为FU header的后五位# 1.网络抽象层单元类型（NALU）
+NALU 头由一个字节组成, 它的语法如下:
+0x7C0x850xB80x00x10x400x00x20xFF0xFF
+0x7C
+0x85 
+SER   Type
+100 0 0101
+
+S=1 开始包 Type =5 1-23 NAL单元 单个 NAL 单元包.
+
+0x50 
+
+0101 0000
+
+0x45
+0100 0101
+
+

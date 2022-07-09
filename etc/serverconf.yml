@@ -10,13 +10,16 @@ mqtt:
   hearttime: 30
 stream:
   debug: false
+  ionsfu: true
+  livekitsfu: true
 livekit:
   token:
     create: true
     join: true
     admin: true
     list: true
-    host: ws://192.168.0.18:7880
+    livekithost: ws://192.168.0.18:7880
+    ionhost: 192.168.0.18:5551
     api_key: APINrg5cyLqPK3p
     api_secret: yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe
     identity: 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/xiangxud/rtmp_webrtc_server/config"
+	"github.com/xiangxud/rtmp_webrtc_server/turnserver"
 	// "github.com/xiangxud/rtmp_webrtc_server/livekitserver"
 	"github.com/xiangxud/rtmp_webrtc_server/log"
 	"github.com/xiangxud/rtmp_webrtc_server/util"
@@ -35,7 +36,7 @@ func main() {
 	// go livekitserver.Livekit_server(ctx)
 	go startRTMPServer(ctx, m)
 	go mqtt.StartMqtt(ctx)
-	// go turn.TurnServer() //livekit always turnserver in livekit package
+	go turnserver.TurnServer() //livekit always turnserver in livekit package
 	http.Handle("/", http.FileServer(http.Dir("./web_client")))
 	go panic(http.ListenAndServe(":8088", nil))
 	<-ctx.Done()

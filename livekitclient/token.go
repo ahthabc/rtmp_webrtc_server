@@ -9,18 +9,19 @@ import (
 )
 
 type Token struct {
-	Create    bool   `yaml:"create" mapstructure:"create"`
-	Join      bool   `yaml:"join"  mapstructure:"join"`
-	Admin     bool   `yaml:"admin"  mapstructure:"admin"`
-	List      bool   `yaml:"list"  mapstructure:"list"`
-	Host      string `yaml:"host" mapstructure:"host"`
-	ApiKey    string `yaml:"api_key"  mapstructure:"api_key"`
-	ApiSecret string `yaml:"api_secret" mapstructure:"api_secret"`
-	Identity  string `yaml:"identity"  mapstructure:"identity"`
-	RoomName  string `yaml:"room_name"  mapstructure:"room_name"`
-	Room      string `yaml:"room"  mapstructure:"room"`
-	Metadata  string `yaml:"metadata"  mapstructure:"metadata"`
-	ValidFor  string `yaml:"valid_for"  mapstructure:"valid_for"`
+	Create      bool   `yaml:"create" mapstructure:"create"`
+	Join        bool   `yaml:"join"  mapstructure:"join"`
+	Admin       bool   `yaml:"admin"  mapstructure:"admin"`
+	List        bool   `yaml:"list"  mapstructure:"list"`
+	HostLiveKit string `yaml:"livekithost" mapstructure:"livekithost"`
+	HostIon     string `yaml:"ionhost" mapstructure:"ionhost"`
+	ApiKey      string `yaml:"api_key"  mapstructure:"api_key"`
+	ApiSecret   string `yaml:"api_secret" mapstructure:"api_secret"`
+	Identity    string `yaml:"identity"  mapstructure:"identity"`
+	RoomName    string `yaml:"room_name"  mapstructure:"room_name"`
+	Room        string `yaml:"room"  mapstructure:"room"`
+	Metadata    string `yaml:"metadata"  mapstructure:"metadata"`
+	ValidFor    string `yaml:"valid_for"  mapstructure:"valid_for"`
 }
 
 func (t *Token) GetJoinToken() (string, error) {

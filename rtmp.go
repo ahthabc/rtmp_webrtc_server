@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"time"
 
 	"github.com/xiangxud/rtmp_webrtc_server/log"
 
@@ -55,7 +54,7 @@ func startRTMPServer(ctx context.Context, streammanager *media_interface.StreamM
 	go func() {
 
 		<-ctx.Done()
-		streammanager.End()
+		streammanager.EndRTMP()
 		if err = srv.Close(); err != nil {
 			log.Error(err)
 		}
@@ -96,7 +95,7 @@ func (h *Handler) OnPublish(timestamp uint32, cmd *rtmpmsg.NetStreamPublish) err
 		return errors.New("PublishingName is empty")
 	}
 	s := media_interface.Stream{}
-	s.InitStream(cmd.PublishingType, cmd.PublishingName, "", "")
+	s.InitStream(cmd.PublishingType, cmd.PublishingName, "", "", "RTMP")
 	// s.InitAudio()
 	// s.InitVideo()
 	h.streamname = cmd.PublishingName
@@ -217,12 +216,7 @@ func (h *Handler) OnVideo(timestamp uint32, payload io.Reader) error {
 
 		offset += int(bufferLength)
 	}
-	room, err := h.streammanager.GetRoom("")
-	if err != nil {
-		log.Debug(err, "error GetRoom")
-	} else {
-		room.TrackSendData(h.streamname, "video", outBuf, time.Second/30)
-	}
+
 	stream, err := h.streammanager.GetStream(h.streamname)
 	if err != nil {
 		log.Debug(err, "error Get current Stream ")

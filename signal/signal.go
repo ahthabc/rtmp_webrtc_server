@@ -56,6 +56,15 @@ func Encode(obj interface{}) string {
 
 	return base64.StdEncoding.EncodeToString(b)
 }
+func DecodeBase64(in string, obj *string) error {
+	b, err := base64.StdEncoding.DecodeString(in)
+	if err != nil {
+		// panic(err)
+		return err
+	}
+	*obj = string(b)
+	return nil
+}
 
 // Decode decodes the input from base64
 // It can optionally unzip the input after decoding

@@ -1,0 +1,134 @@
+package stream
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
+// Request SRS RTC API, the apiPath like "/rtc/v1/play", the r is WebRTC url like
+// "webrtc://localhost/live/livestream", and the offer is SDP in string.
+//
+// Return the response of answer SDP in string.
+func apiRtcRequest(ctx context.Context, apiPath, rtcurl, offer string) (string, error) {
+	u, err := url.Parse(rtcurl)
+	if err != nil {
+		return "", errors.Wrapf(err, "Parse url %v", rtcurl)
+	}
+
+	// Build api url.
+	host := u.Host
+	if !strings.Contains(host, ":") {
+		host += ":1985"
+	}
+
+	api := fmt.Sprintf("http://%v", host)
+	if !strings.HasPrefix(apiPath, "/") {
+		api += "/"
+	}
+	api += apiPath
+
+	if !strings.HasSuffix(apiPath, "/") {
+		api += "/"
+	}
+	if u.RawQuery != "" {
+		api += "?" + u.RawQuery
+	}
+
+	// Build JSON body.
+	reqBody := struct {
+		Api       string `json:"api"`
+		ClientIP  string `json:"clientip"`
+		SDP       string `json:"sdp"`
+		StreamURL string `json:"streamurl"`
+	}{
+		api, "", offer, rtcurl,
+	}
+
+	resBody := struct {
+		Code    int    `json:"code"`
+		Session string `json:"sessionid"`
+		SDP     string `json:"sdp"`
+	}{}
+
+	if err := apiRequest(ctx, api, reqBody, &resBody); err != nil {
+		return "", errors.Wrapf(err, "request api=%v", api)
+	}
+
+	if resBody.Code != 0 {
+		return "", errors.Errorf("Server fail code=%v", resBody.Code)
+	}
+	logrus.Infof("Parse response to code=%v, session=%v, sdp=%v",
+		resBody.Code, resBody.Session, escapeSDP(resBody.SDP))
+	logrus.Infof("Parse response to code=%v, session=%v, sdp=%v bytes",
+		resBody.Code, resBody.Session, len(resBody.SDP))
+
+	return resBody.SDP, nil
+}
+
+func escapeSDP(sdp string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(sdp, "\r", "\\r"), "\n", "\\n")
+}
+
+// Request SRS API and got response, both in JSON.
+// The r is HTTP API to request, like "http://localhost:1985/rtc/v1/play".
+// The req is the HTTP request body, will be marshal to JSON object. nil is no body
+// The res is the HTTP response body, already unmarshal to JSON object.
+func apiRequest(ctx context.Context, r string, req interface{}, res interface{}) error {
+	var b []byte
+	if req != nil {
+		if b0, err := json.Marshal(req); err != nil {
+			return errors.Wrapf(err, "Marshal body %v", req)
+		} else {
+			b = b0
+		}
+	}
+	logrus.Infof("Request url api=%v with %v", r, string(b))
+	logrus.Infof("Request url api=%v with %v bytes", r, len(b))
+
+	method := "POST"
+	if req == nil {
+		method = "GET"
+	}
+	reqObj, err := http.NewRequest(method, r, strings.NewReader(string(b)))
+	if err != nil {
+		return errors.Wrapf(err, "HTTP request %v", string(b))
+	}
+
+	resObj, err := http.DefaultClient.Do(reqObj.WithContext(ctx))
+	if err != nil {
+		return errors.Wrapf(err, "Do HTTP request %v", string(b))
+	}
+
+	b2, err := ioutil.ReadAll(resObj.Body)
+	if err != nil {
+		return errors.Wrapf(err, "Read response for %v", string(b))
+	}
+	logrus.Infof("Response from %v is %v", r, string(b2))
+	logrus.Infof("Response from %v is %v bytes", r, len(b2))
+
+	errorCode := struct {
+		Code int `json:"code"`
+	}{}
+	if err := json.Unmarshal(b2, &errorCode); err != nil {
+		return errors.Wrapf(err, "Unmarshal %v", string(b2))
+	}
+	if errorCode.Code != 0 {
+		return errors.Errorf("Server fail code=%v %v", errorCode.Code, string(b2))
+	}
+
+	if err := json.Unmarshal(b2, res); err != nil {
+		return errors.Wrapf(err, "Unmarshal %v", string(b2))
+	}
+	logrus.Infof("Parse response to code=%v ok, %v", errorCode.Code, res)
+
+	return nil
+}
+
+// 原文链接：https://blog.csdn.net/hzb869168467/article/details/123038270

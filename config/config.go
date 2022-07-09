@@ -9,6 +9,7 @@ import (
 	"github.com/toolkits/pkg/file"
 	"github.com/xiangxud/rtmp_webrtc_server/identity"
 	"github.com/xiangxud/rtmp_webrtc_server/livekitclient"
+	// "github.com/xiangxud/rtmp_webrtc_server/livekitclient"
 )
 
 type ConfigT struct {
@@ -18,7 +19,9 @@ type ConfigT struct {
 	Livekit livekitSection `yaml:"livekit" mapstructure:"livekit"`
 }
 type streamSection struct {
-	Debug bool `yaml:"debug" mapstructure:"debug"`
+	Debug            bool `yaml:"debug" mapstructure:"debug"`
+	IONSfuEnable     bool `yaml:"ionsfu" mapstructure:"ionsfu"`
+	LiveKitSfuEnable bool `yaml:"livekitsfu" mapstructure:"livekitsfu"`
 }
 type livekitSection struct {
 	Token livekitclient.Token `yaml:"token"`
