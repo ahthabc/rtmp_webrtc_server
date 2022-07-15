@@ -103,7 +103,9 @@ func StartPullDeviceStream(deviceid string, msg *Message) {
 	if device == nil {
 		device = livekitclient.NewDevice(deviceid, deviceid, msg.Describestreamname)
 		room := m.GetDefaultRoom()
-		device.PRoomList[room.Identity] = room
+		if room != nil {
+			device.PRoomList[room.Identity] = room
+		}
 		deviceroom.AddDevice(device)
 	} else {
 		device.SetStreamname(msg.Describestreamname)

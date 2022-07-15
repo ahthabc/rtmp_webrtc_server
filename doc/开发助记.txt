@@ -2,6 +2,14 @@
 rtmp推流至webrtc
 rtmp 推流至livekit
 livekit 视频会议
+ion  视频会议
+
+flutter client_app
+2022-07-10
+由于短时间无法解决视频会议的视频现实问题，决定自己用flutter 写一个跨平台的多流展示界面
+
+alsa pcm 相关知识
+https://magodo.github.io/alsa-pcm/
 
 livekit 获取token
 ./livekit-cli create-token --api-key APINrg5cyLqPK3p --api-secret yhmmq0BnW2kTTgGWvwdzwD7MhyEHO5RrDUpprGeBhxe --create  --list  --join --identity "user" --room 50:9a:4c:3c:2d:b5 --valid-for "10000h"

@@ -37,6 +37,7 @@ const (
 	CMDMSG_DELETEPEER                   = "deletepeer"
 	CMDMSG_SERVER_PULLSTREAMFROM_DEVICE = "serverpull" //由客户端告诉服务端向设备拉流
 	MODE_RTMP                           = "rtmp"
+	MODE_WEBRTC                         = "webrtc"
 	MODE_REQPULL                        = "reqpull"
 	MODE_DEVPUSH                        = "devpush"
 	MODE_ANSWER                         = "answer"
@@ -249,7 +250,7 @@ func createPeerConnection(msg Message) {
 		Topic:     TOPIC_ANSWER,
 		Msg:       req,
 	}
-	log.Debugf("answer %s", msg.SeqID)
+	log.Debug("answer ", answermsg)
 	SendMsg(answermsg)
 
 }
@@ -257,7 +258,8 @@ func createPeerConnection(msg Message) {
 func Notice(msg Message) {
 
 	switch msg.Mode {
-
+	case MODE_WEBRTC:
+		go createPeerConnection(msg)
 	case MODE_RTMP:
 		go createPeerConnection(msg)
 	case MODE_REQPULL:

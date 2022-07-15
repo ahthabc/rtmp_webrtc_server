@@ -129,7 +129,9 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					// fmt.Println(filename, pkt.Timestamp)
 					if err != nil {
 						log.Debug(err)
-						break
+						pps.bAudioStop = true
+						continue
+						//break
 					}
 
 					stream.SendStreamAudioFromWebrtc(pkt.Payload)
@@ -138,7 +140,9 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					n, _, readErr := track.Read(b)
 					if readErr != nil {
 						// log.Debug(readErr)
-						break
+						pps.bAudioStop = true
+						continue
+						//break
 						//panic(readErr)
 					}
 					stream.SendStreamAudioFromWebrtc(b[:n])
@@ -171,7 +175,8 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					errSend := pps.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
 					if errSend != nil {
 						log.Debug(errSend)
-						break
+						pps.bVideoStop = true
+						// break
 					}
 					if pps.bVideoStop {
 						break
@@ -188,7 +193,9 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					n, _, readErr := track.Read(b)
 					if readErr != nil {
 						log.Debug(readErr)
-						break
+						pps.bVideoStop = true
+						continue
+						//break
 					}
 					stream.SendStreamVideo(b[:n])
 					// if n > 30 {
@@ -199,7 +206,9 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					pkt, _, err := track.ReadRTP()
 					if err != nil {
 						log.Debug(err)
-						break
+						pps.bVideoStop = true
+						continue
+						//break
 						//return
 					}
 					// n, _, readErr := track.Read(b)
@@ -231,7 +240,9 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 					datas, err := h264packet.GetRTPRawH264(pkt)
 					if err != nil {
 						log.Debug(err)
-						break
+						pps.bVideoStop = true
+						continue
+						//break
 					}
 					stream.SendStreamVideo(datas)
 				}

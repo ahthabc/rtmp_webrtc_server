@@ -10,8 +10,8 @@ mqtt:
   hearttime: 30
 stream:
   debug: false
-  ionsfu: true
-  livekitsfu: true
+  ionsfu: false
+  livekitsfu: false
 livekit:
   token:
     create: true

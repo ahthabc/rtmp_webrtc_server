@@ -6,7 +6,9 @@ import (
 	"time"
 
 	// "github.com/livekit/server-sdk-go/pkg/media/ivfwriter"
+	"github.com/livekit/server-sdk-go/pkg/samplebuilder"
 	ionsdk "github.com/pion/ion-sdk-go"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/pion/webrtc/v3/pkg/media/h264writer"
@@ -14,6 +16,7 @@ import (
 	"github.com/pion/webrtc/v3/pkg/media/oggwriter"
 	"github.com/xiangxud/rtmp_webrtc_server/identity"
 	"github.com/xiangxud/rtmp_webrtc_server/log"
+	// "github.com/livekit/server-sdk-go/pkg/samplebuilder"
 )
 
 const (
@@ -420,9 +423,21 @@ func (r *Room) TrackSendIonRtpPackets(trackname, kind string, data []byte) (n in
 		log.Debug("TrackSendIonRtpPackets:", "t is nil ->", trackname, "<- no to publish")
 		return 0, fmt.Errorf(" track is null,no to publish")
 	}
-
-	n, err = t.Write(data)
-	return n, err
+	var sb *samplebuilder.SampleBuilder
+	packets := &rtp.Packet{}
+	if err := packets.Unmarshal(data); err != nil {
+		return 0, err
+	}
+	sb.Push(packets)
+	for _, p := range sb.PopPackets() {
+		err = t.WriteRTP(p)
+		if err != nil {
+			log.Debug("[TrackSendIonRtpPackets] error", err)
+			return 0, err
+		}
+	}
+	//n, err = t.Write(data)
+	return len(data), nil
 
 }
 func (r *Room) TrackSendIonData(trackname, kind string, data []byte, duration time.Duration) error {

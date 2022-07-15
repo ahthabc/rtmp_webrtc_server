@@ -15,6 +15,7 @@ import (
 	// "github.com/livekit/server-sdk-go/pkg/media/ivfwriter"
 	// "github.com/livekit/server-sdk-go/pkg/samplebuilder"
 	ionsdk "github.com/pion/ion-sdk-go"
+	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -43,6 +44,9 @@ type LocalTrackPublication struct {
 	IONAudiopub     *webrtc.RTPSender
 	LiveKitSfuTrack SfuTrack
 	IONSfuTrack     SfuTrack
+	livekitsb       *samplebuilder.SampleBuilder
+	// publication *lksdk.RemoteTrackPublication
+	// pliWriter       lksdk.PLIWriter
 	// VideoRTPTrack *webrtc.TrackLocalStaticRTP
 	// AudioRTPTrack *webrtc.TrackLocalStaticRTP
 	// VideoTrack    *webrtc.TrackLocalStaticSample
@@ -161,6 +165,7 @@ func (t *LocalTrackPublication) TrackSubscribed(track *webrtc.TrackRemote, publi
 	fileName := fmt.Sprintf("%s-%s", rp.Identity(), track.ID())
 	fmt.Println("write track to file ", fileName)
 	NewTrackWriter(track, rp.WritePLI, fileName)
+	// t.pliWriter=
 }
 
 const (
@@ -250,10 +255,25 @@ func (r *Room) TrackSendLivekitRtpPackets(trackname, kind string, data []byte) (
 		log.Debug("TrackSendLivekitRtpPackets: ", "t is nil ->", trackname, "<- no to publish")
 		return 0, fmt.Errorf(" track is null,no to publish")
 	}
-
-	n, err = t.Write(data)
-	return n, err
-
+	if kind == "video" {
+		packets := &rtp.Packet{}
+		if err := packets.Unmarshal(data); err != nil {
+			return 0, err
+		}
+		track.livekitsb.Push(packets)
+		for _, p := range track.livekitsb.PopPackets() {
+			err = t.WriteRTP(p)
+			if err != nil {
+				log.Debug("[TrackSendIonRtpPackets] error", err)
+				return 0, err
+			}
+		}
+		//n, err = t.Write(data)
+		return len(data), nil
+	} else {
+		n, err = t.Write(data)
+		return n, err
+	}
 }
 func (r *Room) TrackSendLivekitData(trackname, kind string, data []byte, duration time.Duration) error {
 	if trackname == "" {
@@ -400,9 +420,17 @@ func (r *Room) RTPTrackPublished(trackRemote *webrtc.TrackRemote, streamname str
 			t.ConnectRoom(r.HostLiveKit, r.ApiKey, r.ApiSecret, r.RoomName, streamname+":"+r.Identity)
 			log.Debug("track->", streamname, "<-is nil ,re Connect room", t, r)
 		}
+
 	}
+
 	if t.LiveKitSfuTrack.VideoRTPTrack == nil {
 		if strings.Contains(trackRemote.Codec().MimeType, "video") {
+			if t.livekitsb == nil {
+				t.livekitsb = samplebuilder.New(maxVideoLate, &codecs.H264Packet{}, trackRemote.Codec().ClockRate) //, samplebuilder.WithPacketDroppedHandler(func() {
+				// 	t.Videopub.WritePLI(trackRemote.SSRC())
+				// }))
+				// t.Videopub.WritePLI
+			}
 			videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, streamname+"-video", streamname)
 			if err != nil {
 				panic(err)
