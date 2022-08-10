@@ -10,6 +10,8 @@ importScripts("./windows.js")
 importScripts("./mqtt.js")
 importScripts("./webrtc.js")
 importScripts("./datachannel.js")
+importScripts("./adapter-latest.js")
+{/* <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script> */}
 function log(msg) {
   console.log(msg);
     // $("#loger").html(msg);

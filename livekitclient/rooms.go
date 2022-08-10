@@ -392,7 +392,9 @@ func (r *Room) TrackPublished(streamname string) error {
 	}
 	return nil
 }
-func (r *Room) RTPTrackPublished(trackRemote *webrtc.TrackRemote, streamname string) error {
+
+//from call package media stream
+func (r *Room) RTPTrackPublished(trackRemote []*webrtc.TrackRemote, streamname string) error {
 	// - `in` implements io.ReadCloser, such as buffer or file
 	// - `mime` has to be one of webrtc.MimeType...
 	// videoTrack, err := lksdk.NewLocalSampleTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264})
@@ -422,50 +424,56 @@ func (r *Room) RTPTrackPublished(trackRemote *webrtc.TrackRemote, streamname str
 		}
 
 	}
+	for _, v := range trackRemote {
+		if v.Kind().String() == "video" {
+			if t.LiveKitSfuTrack.VideoRTPTrack == nil {
+				if strings.Contains(v.Codec().MimeType, "video") {
+					if t.livekitsb == nil {
+						t.livekitsb = samplebuilder.New(maxVideoLate, &codecs.H264Packet{}, v.Codec().ClockRate) //, samplebuilder.WithPacketDroppedHandler(func() {
+						// 	t.Videopub.WritePLI(trackRemote.SSRC())
+						// }))
+						// t.Videopub.WritePLI
+					}
+					videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-video"+v.ID(), streamname)
+					if err != nil {
+						panic(err)
+					}
 
-	if t.LiveKitSfuTrack.VideoRTPTrack == nil {
-		if strings.Contains(trackRemote.Codec().MimeType, "video") {
-			if t.livekitsb == nil {
-				t.livekitsb = samplebuilder.New(maxVideoLate, &codecs.H264Packet{}, trackRemote.Codec().ClockRate) //, samplebuilder.WithPacketDroppedHandler(func() {
-				// 	t.Videopub.WritePLI(trackRemote.SSRC())
-				// }))
-				// t.Videopub.WritePLI
-			}
-			videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, streamname+"-video", streamname)
-			if err != nil {
-				panic(err)
-			}
-
-			// r.RoomClient.MutePublishedTrack(r.Ctx,)
-			// var local_video *lksdk.LocalTrackPublication
-			if t.LiveKitRoomConnect != nil && t.LiveKitRoomConnect.LocalParticipant != nil {
-				if t.Videopub, err = t.LiveKitRoomConnect.LocalParticipant.PublishTrack(videoRTPTrack, &lksdk.TrackPublicationOptions{Name: streamname + "-video"}); err != nil {
-					log.Debug("Error publishing video RTP track->", err)
-					return err
+					// r.RoomClient.MutePublishedTrack(r.Ctx,)
+					// var local_video *lksdk.LocalTrackPublication
+					if t.LiveKitRoomConnect != nil && t.LiveKitRoomConnect.LocalParticipant != nil {
+						if t.Videopub, err = t.LiveKitRoomConnect.LocalParticipant.PublishTrack(videoRTPTrack, &lksdk.TrackPublicationOptions{Name: streamname + "-video" + v.ID()}); err != nil {
+							log.Debug("Error publishing video RTP track->", err)
+							return err
+						}
+						t.LiveKitSfuTrack.VideoRTPTrack = videoRTPTrack
+						r.Localtracks[streamname] = t
+						// r.Localtracks[streamname] = &LocalTrackPublication{p: local_video, Track: videoTrack, Trackname: streamname + "-video"}
+						log.Debug("[RTPTrackPublished]", "published video track -> ", streamname)
+					}
 				}
-				t.LiveKitSfuTrack.VideoRTPTrack = videoRTPTrack
-				r.Localtracks[streamname] = t
-				// r.Localtracks[streamname] = &LocalTrackPublication{p: local_video, Track: videoTrack, Trackname: streamname + "-video"}
-				log.Debug("[RTPTrackPublished]", "published video track -> ", streamname)
 			}
-		}
-	}
-	if t.LiveKitSfuTrack.AudioRTPTrack == nil {
-		if strings.Contains(trackRemote.Codec().MimeType, "audio") {
-			audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, streamname+"-audio", streamname)
-			//audioTrack, err := lksdk.NewLocalSampleTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus})
-			if err != nil {
-				panic(err)
-			}
-			// var local_audio *lksdk.LocalTrackPublication
-			if t.LiveKitRoomConnect != nil && t.LiveKitRoomConnect.LocalParticipant != nil {
-				if t.Audiopub, err = t.LiveKitRoomConnect.LocalParticipant.PublishTrack(audioRTPTrack, &lksdk.TrackPublicationOptions{Name: streamname + "-audio"}); err != nil {
-					log.Debug("Error publishing audio track", err)
-					return err
+		} else {
+			if v.Kind().String() == "audio" {
+				if t.LiveKitSfuTrack.AudioRTPTrack == nil {
+					if strings.Contains(v.Codec().MimeType, "audio") {
+						audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-audio"+v.ID(), streamname)
+						//audioTrack, err := lksdk.NewLocalSampleTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus})
+						if err != nil {
+							panic(err)
+						}
+						// var local_audio *lksdk.LocalTrackPublication
+						if t.LiveKitRoomConnect != nil && t.LiveKitRoomConnect.LocalParticipant != nil {
+							if t.Audiopub, err = t.LiveKitRoomConnect.LocalParticipant.PublishTrack(audioRTPTrack, &lksdk.TrackPublicationOptions{Name: streamname + "-audio" + v.ID()}); err != nil {
+								log.Debug("Error publishing audio track", err)
+								return err
+							}
+							t.LiveKitSfuTrack.AudioRTPTrack = audioRTPTrack
+							r.Localtracks[streamname] = t
+							log.Debug("[RTPTrackPublished]", "published audio track -> ", streamname)
+						}
+					}
 				}
-				t.LiveKitSfuTrack.AudioRTPTrack = audioRTPTrack
-				r.Localtracks[streamname] = t
-				log.Debug("[RTPTrackPublished]", "published audio track -> ", streamname)
 			}
 		}
 	}

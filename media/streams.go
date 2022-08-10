@@ -227,7 +227,7 @@ type Stream struct {
 	peers          map[string]*Peer
 	audioDecoder   *fdkaac.AacDecoder
 	audioEncoder   *opus.Encoder
-	remotetrack    *webrtc.TrackRemote
+	remotetrack    []*webrtc.TrackRemote
 	audioBuffer    []byte
 	audioClockRate uint32
 	//room                   *lksdk.Room //for publish to livekit room ,first create room as streamname for livekit,then publish track to livekit
@@ -237,7 +237,14 @@ type Stream struct {
 }
 
 func (s *Stream) SetRemoteTrack(remotetrack *webrtc.TrackRemote) {
-	s.remotetrack = remotetrack
+	s.remotetrack = append(s.remotetrack, remotetrack)
+}
+func (s *Stream) GetRemoteTrack() ([]*webrtc.TrackRemote, error) {
+	if s.remotetrack == nil {
+		return nil, errors.New(" not remotetrack")
+	} else {
+		return s.remotetrack, nil
+	}
 }
 func (s *Stream) InitStream(streamid string,
 	streamname string,
@@ -654,7 +661,10 @@ func (m *StreamManager) SetStream(name string, s *Stream) error {
 	}
 }
 func (m *StreamManager) EndRTMP() {
-	m.GetDefaultRoom().Close()
+	room := m.GetDefaultRoom()
+	if room != nil {
+		room.Close()
+	}
 }
 func (m *StreamManager) EndAll() {
 	for _, room := range m.roomMap {

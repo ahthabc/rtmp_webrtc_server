@@ -2,13 +2,41 @@ var pc;
 var mqttclient;
 var WEB_SEQID;
 var suuid;
-var MqttServer = "ws://192.168.0.18:8083/mqtt";
+var local;
+var localStream;
+// var MqttServerWSS = "wss://192.168.0.18:8084/mqtt"//"wss://192.168.0.18:8084/mqtt";
+// var MqttServer = "wss://39.98.198.244:8084/mqtt"
+var MqttServer="wss://192.168.0.18:8084/mqtt";
 var SERVER_NAME="50:9a:4c:3c:2d:b5"//document.getElementById("serverId").value; 与服务器的SN配置结果一致，目前采用的是机器的mac地址
-var DEVICE_NAME="4E:7B:BF:71:D6:B4"
+var DEVICE_NAME="50:9A:4C:3C:2D:B5"//"4E:7B:BF:71:D6:B4"
+var kvs=true;
 if(SERVER_NAME===""){
     SERVER_NAME="50:9a:4c:3c:2d:b5";
 }
+let startTime;
+var remoteVideo=document.getElementById('remote-video');
 
+// -------- codec 的配置 --------
+const codecPreferences = document.getElementById('codecPreferences');
+const supportsSetCodecPreferences = window.RTCRtpTransceiver &&
+  'setCodecPreferences' in window.RTCRtpTransceiver.prototype;
+// -----------------------------
+  if (supportsSetCodecPreferences) {
+    const { codecs } = RTCRtpSender.getCapabilities('video');
+    console.log('RTCRtpSender.getCapabilities(video):\n', codecs);
+    codecs.forEach(codec => {
+      if (['video/red', 'video/ulpfec', 'video/rtx'].includes(codec.mimeType)) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = (codec.mimeType + ' ' + (codec.sdpFmtpLine || '')).trim();
+      option.innerText = option.value;
+      codecPreferences.appendChild(option);
+    });
+    codecPreferences.disabled = false;
+  } else {
+    console.warn('当前不支持更换codec');
+  }
 function suuid() {
      
 	var s = [];

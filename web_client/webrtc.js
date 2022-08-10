@@ -27,22 +27,178 @@
     //   .then(res => pc.setRemoteDescription(res))
     //   .catch(alert)
 
+function setkvstype(){
+    kvs=true;
+    console.log("Setting kvsRTC");
+}
+function setmetartctype(){
+    kvs=false;
+    console.log("Setting metaRTC");
+}
 
-function initWebRTC() {
+function gotStream(stream){
+  localvideo.src = webkitURL.createObjectURL(stream);
+}
+function getUserMedia(obj,success,error){
+    if(navigator.getUserMedia){
+    getUserMedia=function(obj,success,error){
+    navigator.getUserMedia(obj,function(stream){
+    success(stream);
+    },error);
+    }
+    }else if(navigator.webkitGetUserMedia){
+    getUserMedia=function(obj,success,error){
+    navigator.webkitGetUserMedia(obj,function(stream){
+    var _URL=window.URL || window.webkitURL;
+    success(_URL.createObjectURL(stream));
+    },error);
+    }
+    }else if(navigator.mozGetUserMedia){
+    getUserMedia=function(obj,success,error){
+    navigator.mozGetUserMedia(obj,function(stream){
+    success(window.URL.createObjectURL(stream));
+    },error);
+    }
+    }else{
+    return false;
+    }
+    return getUserMedia(obj,success,error);
+}
+async function onIceCandidate(pc, event) {
+    try {
+    //   await (getOtherPc(pc).addIceCandidate(event.candidate));
+      onAddIceCandidateSuccess(pc);
+    } catch (e) {
+      onAddIceCandidateError(pc, e);
+    }
+    console.log(`${getName(pc)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+  }
+
+  function onAddIceCandidateSuccess(pc) {
+    console.log(`${getName(pc)} addIceCandidate success`);
+  }
+  function onAddIceCandidateError(pc, error) {
+    console.log(`${getName(pc)} failed to add ICE Candidate: ${error.toString()}`);
+  }  
+
+  function getName(pc) {
+    return (pc === pc) ?'pc':'pc';//? 'pc1' : 'pc2';
+  }
+//   https://www.bbsmax.com/A/lk5a8R7PJ1/
+// https://blog.csdn.net/lym594887256/article/details/124472804
+// https://blog.csdn.net/ice_ly000/article/details/105763753
+function  initWebRTC()  {
+        startTime = window.performance.now();
         if (bWebrtc == true) return
         bWebrtc = true
         pc = new RTCPeerConnection({
             iceServers: ICEServer//ICEServer
         });
-        //如果是
-        if (bVideo) {
-            const { receiver } = pc.addTransceiver('video', { direction: 'recvonly' });
+        const videoTracks = localStream.getVideoTracks();
+        const audioTracks = localStream.getAudioTracks();
+        if (videoTracks.length > 0) {
+          console.log(`使用的摄像头: ${videoTracks[0].label}`);
+        }
+        if (audioTracks.length > 0) {
+          console.log(`使用的麦克风: ${audioTracks[0].label}`);
+        }
+        // const configuration = {};
+        // pc1 = new RTCPeerConnection(configuration);
+        // pc1.addEventListener('icecandidate', e => onIceCandidate(pc1, e));
+        // pc2 = new RTCPeerConnection(configuration);
+        // pc2.addEventListener('icecandidate', e => onIceCandidate(pc2, e));
+        // pc2.addEventListener('track', gotRemoteStream);    
 
-            receiver.playoutDelayHint = 0.0;
+        pc.addEventListener('icecandidate', e => onIceCandidate(pc, e));
+        var radio=document.getElementsByName("apptype");
+
+        for(var i=0;i<radio.length;i++){
+
+           if(radio[i].checked){
+             if(i==0) setkvstype();
+             else setmetartctype();
+        //   radio[i].addEventListener("click",clickFunction);
+
+          }
+
         }
-        if (bAudio) {
-            const { receiveraudio } = pc.addTransceiver('audio', { direction: 'recvonly' });
-        }
+        
+        // const videotrack,audiotrack;
+        // codec_parameters = OrderedDict(
+        //     [
+        //         ("packetization-mode", "1"),
+        //         ("level-asymmetry-allowed", "1"),
+        //         ("profile-level-id", "42001f"),
+        //     ]
+        // )
+        
+        // h264_capability = RTCRtpCodecCapability(
+        //     mimeType="video/H264", clockRate=90000, channels=None, parameters=codec_parameters
+        // )
+        
+        // preferences = [h264_capability]
+        // later to be applied to the video transceiver
+        
+        // for t in pc.getTransceivers():
+        //         if t.kind == "audio" and player.audio:
+        //             pc.addTrack(player.audio)
+        //         elif t.kind == "video" and player.video:
+        //             pc.addTrack(player.video)
+        //             t.setCodecPreferences(preferences)
+
+        //如果是
+        //     if(kvs){
+        //         console.log(" kvsRTC mode");
+        //         if (bVideo) {
+
+        //             for (const track of localStream.getTracks()) {
+        //                 if(track.kind=="vedio")  {pc.addTrack(track); break};
+        //                 // else if(track.kind=="audioinput") audiotrack=track;
+        //                 // peerconnetion.addTrack(track);
+        //             }
+                   
+        //             // const { receiver } =  pc.addTransceiver('video', { direction: 'sendrecv' });
+        
+        //             //  receiver.playoutDelayHint = 0.0;
+        //         }
+        //         if (bAudio) {
+        //             for (const track of localStream.getTracks()) {
+        //                 if(track.kind=="audio")  {pc.addTrack(track); break};
+        //                 // else if(track.kind=="audioinput") audiotrack=track;
+        //                 // peerconnetion.addTrack(track);
+        //             }
+        //             // pc.addTrack(audiotrack);
+        //             // const { receiveraudio } = pc.addTransceiver('audio', { direction: 'sendrecv' });
+        //         }
+        
+        //     }else{
+        //         console.log(" metaRTC mode");
+        //         if (bAudio) {
+        //             for (const track of localStream.getTracks()) {
+        //                 if(track.kind=="vedio")  {pc.addTrack(track); break};
+        //                 // else if(track.kind=="audioinput") audiotrack=track;
+        //                 // peerconnetion.addTrack(track);
+        //             }
+        //             // pc.addTrack(audiotrack);
+        //             // const { receiveraudio } = pc.addTransceiver('audio', { direction: 'sendrecv' });
+        //         }
+        //         if (bVideo) {
+        //             for (const track of localStream.getTracks()) {
+        //                 if(track.kind=="audio")  {pc.addTrack(track); break};
+        //                 // else if(track.kind=="audioinput") audiotrack=track;
+        //                 // peerconnetion.addTrack(track);
+        //             }
+        //             // pc.addTrack(videotrack);
+        //             // const { receiver } = pc.addTransceiver('video', { direction: 'sendrecv' });
+
+        //             // receiver.playoutDelayHint = 0.0;
+        //         }
+        //   }
+        //   for (const t of pc.getTransceivers()){
+        //         if(t.kind == "video"){
+        //             t.setCodecPreferences(preferences)
+        //         }
+        // }
         pc.onsignalingstatechange = ev => {
             switch (pc.signalingState) {
                 case "stable":
@@ -50,19 +206,46 @@ function initWebRTC() {
                     break;
             }
         };
+
+   
         pc.ontrack = function (event) {
             console.log("ontrack", event.track.kind)
-            var video=document.getElementById('remote-video')
             var el = document.createElement(event.track.kind)
             el.srcObject = event.streams[0]
             el.autoplay = true
             el.controls = true
             document.getElementById('remote-video').appendChild(el)
         }
+
+
        initControl();
+       localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
         pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
-
-
+        if (supportsSetCodecPreferences) {
+            // 获取选择的codec
+            const preferredCodec = codecPreferences.options[codecPreferences.selectedIndex];
+            if (preferredCodec.value !== '') {
+              const [mimeType, sdpFmtpLine] = preferredCodec.value.split(' ');
+              const { codecs } = RTCRtpSender.getCapabilities('video');
+              const selectedCodecIndex = codecs.findIndex(c => c.mimeType === mimeType && c.sdpFmtpLine === sdpFmtpLine);
+              const selectedCodec = codecs[selectedCodecIndex];
+              codecs.splice(selectedCodecIndex, 1);
+              codecs.unshift(selectedCodec);
+              console.log(codecs);
+              const transceiver = pc.getTransceivers().find(t => t.sender && t.sender.track === localStream.getVideoTracks()[0]);
+              transceiver.setCodecPreferences(codecs);
+              console.log('选择的codec', selectedCodec);
+            }
+          }
+        codecPreferences.disabled = true;
+        remoteVideo.addEventListener('resize', () => {
+        console.log(`Remote video size changed to ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+        if (startTime) {
+            const elapsedTime = window.performance.now() - startTime;
+            console.log('视频流连接耗时: ' + elapsedTime.toFixed(3) + 'ms');
+            startTime = null;
+        }
+        });
         pc.onicecandidate = event => {
             if(!bDevicePull){
             if (event.candidate === null) {
@@ -106,7 +289,11 @@ function initWebRTC() {
         }
         }
         if(!bDevicePull){
-        pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+        const offerOption = {
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+        };
+        pc.createOffer(offerOption).then(d => pc.setLocalDescription(d)).catch(log)
         }
     }
     function endWebrtc() {

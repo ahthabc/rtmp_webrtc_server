@@ -12,7 +12,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pion/interceptor v0.1.11
-	github.com/pion/ion-log v1.2.2
 	github.com/pion/ion-sdk-go v0.7.1-0.20220406041327-12e32a5871b9
 	github.com/pion/rtcp v1.2.9
 	github.com/pion/rtp v1.7.13
@@ -35,6 +34,7 @@ require (
 require (
 	github.com/livekit/rtcscore-go v0.0.0-20220524203225-dfd1ba40744a // indirect
 	github.com/magefile/mage v1.13.0 // indirect
+	github.com/pion/ion-log v1.2.2 // indirect
 )
 
 // replace github.com/pion/ion-sdk-go v0.7.0  => github.com/pion/ion-sdk-go.git branch master

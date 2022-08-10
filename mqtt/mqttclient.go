@@ -174,25 +174,58 @@ func createPeerConnection(msg Message) {
 		}
 	})
 	if s.IsRtpStream() {
-		videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+		//webrtc track forward use s.remotetrack.codec().RTPCodecCapability
+		var videoRTPTrack, audioRTPTrack *webrtc.TrackLocalStaticRTP
+		// var  err  error
+		rmtrack, err := s.GetRemoteTrack()
+		streamname := msg.Describestreamname
+
 		if err != nil {
-			panic(err)
-		}
-		if _, err = peerConnection.AddTrack(videoRTPTrack); err != nil {
-			panic(err)
+			for _, v := range rmtrack {
+				if v.Kind().String() == "video" {
+					videoRTPTrack, err = webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-"+v.Kind().String()+v.ID(), streamname)
+					if err != nil {
+						panic(err)
+					}
+					p.AddVideoRTPTrack(videoRTPTrack)
+					if _, err = peerConnection.AddTrack(videoRTPTrack); err != nil {
+						panic(err)
+					}
+					p.AddAudioRTPTrack(audioRTPTrack)
+
+				} else if v.Kind().String() == "audio" {
+					audioRTPTrack, err = webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-"+v.Kind().String()+v.ID(), streamname)
+					if err != nil {
+						panic(err)
+					}
+					p.AddVideoRTPTrack(videoRTPTrack)
+					if _, err = peerConnection.AddTrack(audioRTPTrack); err != nil {
+						panic(err)
+					}
+					p.AddAudioRTPTrack(audioRTPTrack)
+				}
+			}
+		} else {
+			videoRTPTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+			if err != nil {
+				panic(err)
+			}
+			if _, err = peerConnection.AddTrack(videoRTPTrack); err != nil {
+				panic(err)
+			}
+			p.AddVideoRTPTrack(videoRTPTrack)
+			audioRTPTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
+			if err != nil {
+				panic(err)
+			}
+			if _, err = peerConnection.AddTrack(audioRTPTrack); err != nil {
+				panic(err)
+			}
+			p.AddAudioRTPTrack(audioRTPTrack)
 		}
 
-		// audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMA}, "audio", "pion")
-		audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
-		if err != nil {
-			panic(err)
-		}
-		if _, err = peerConnection.AddTrack(audioRTPTrack); err != nil {
-			panic(err)
-		}
 		p.AddConnect(msg.Describestreamname, peerConnection)
-		p.AddAudioRTPTrack(audioRTPTrack)
-		p.AddVideoRTPTrack(videoRTPTrack)
+
 	} else {
 		videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
 		if err != nil {

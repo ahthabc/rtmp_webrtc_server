@@ -5,16 +5,45 @@
 
   <body>
     <h1> RTMP WebRTC Server </h1>
+    <div id="app">
+      <label style="width:120px;">
+      <input type="radio" name="apptype" id="rtc_app_type" οnclick="setkvstype()" checked="true" value="kvsRTC" />
+      kvsRTC
+    </label>
+    <label style="width:120px;">
+      <input type="radio" name="apptype" id="rtc_app_type" οnclick="setmetatype()"  value="metaRTC" />
+      metaRTC
+    </label>
+    <label style="width:120px;">
+      <input type="checkbox" name="localVideo" id="localVideo"  checked="true"  />
+      开启本地视频
+    </label>
+    <label style="width:120px;">
+      <input type="checkbox" name="localAudio" id="localAudio"  checked="true" />
+      开启本地音频
+    </label>    
+    </div>  
+    <div class="box">
+      <span>选择Codec:</span>
+      <select id="codecPreferences" disabled>
+          <option selected value="">Default</option>
+      </select>
+      <div id="actualCodec"></div>
+    </div>
+    <br>
     <div class="row">
       <form action="demo_form.html" method="get">
         服务器名称: <input type="text"  name="servername" id="serverId" value="rtmpserver1"><button type="button" onclick="startSession()" id="connection_btn">开始拉流 </button><br>
         拉 流  名 称: <input type="text"  name="streamname" id="streamId" value="kvs"><button type="button"  onclick="endSession()" id="close_btn">停止拉流</button><br>
-        设 备  名 称: <input type="text"  name="devicename" id="deviceId" value="4E:7B:BF:71:D6:B4"><button type="button"  onclick="startDeviceSession()" id="startdevicesession_btn">p2p设备拉流</button><button type="button"  onclick="startDevicePull()" id="startdevicepull_btn">p2p设备推流</button><button type="button"  onclick="startDevicetoLivekit()" id="startdevicetolivekit_btn">设备推流至视频会议</button>
+        设 备  名 称: <input type="text"  name="devicename" id="deviceId" value="50:9A:4C:3C:2D:B5"><button type="button"  onclick="startDeviceSession()" id="startdevicesession_btn">p2p设备拉流</button><button type="button"  onclick="startDevicePull()" id="startdevicepull_btn">p2p设备推流</button><button type="button"  onclick="startDevicetoLivekit()" id="startdevicetolivekit_btn">设备推流至视频会议</button>
         <button type="button"  onclick="FullScreen()" id="fullscreen_btn">全  屏</button><br>
         数 据  发 送：<input type="text"  name="msgout" id="controlInput"  value="msgout"><button type="button"  onclick="controlSend()" id="control-send">发送控制消息</button><br>
         数 据  接 收：<input type="text"  name="msgin" id="control_output"  value="msgin"><br>
       </form>
 
+    </div>
+    <div id="container">
+      <video id="localvideo" autoplay width=100></video>    
     </div>
 
     <div id="remote-video"></div>
@@ -44,13 +73,154 @@
       </video>
     </div> -->
   </body>
-  <!-- <script> 
-
-  </script> -->
-  <!-- <script src="start.js"></script> -->
-  <!-- <script src="webrtc.js"></script>
-  <script src="mqtt.js"></script> -->
   <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/2.18.8/mqtt.min.js"></script> 
   <script src="start.js"></script>
+  <script>
+//   function getUserMedia() {
+//     return new Promise((resolve, reject) => {
+//         navigator.mediaDevices.enumerateDevices().then((devices) => {
+//             if (!isGet) {
+//                 isGet = true;
+//                 devices.forEach((devInfo) => {
+//                     var option = document.createElement('option');
+//                     option.text = devInfo.label;
+//                     option.value = devInfo.deviceId;
+//                     if (devInfo.kind === 'audioinput') {
+//                         audioSource.appendChild(option);
+//                     } else if (devInfo.kind === 'audiooutput') {
+//                         audioOutput.appendChild(option);
+//                     } else if (devInfo.kind === 'videoinput') {
+//                         videoSource.appendChild(option);
+//                     }
+//                 });
+//             }
+//             resolve(devices);
+//         });
+//     });
+// }
 
+//   function startWebCam() {
+//     return new Promise((resolve, reject) => {
+//         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+//             document.write('当前浏览器不支持 getUserMedia()！！！！/n');
+//             return reject('当前浏览器不支持 getUserMedia()！！！！/n');
+//         } else {
+
+//             // 想要获取一个最接近 1280x720 的相机分辨率
+//             const videoDeviceIds = videoSource.value;
+//             const audioDeviceIds = audioSource.value;
+//             var constraints = {
+//                 audio: {
+//                     noiseSuppression: true, // 降噪
+//                     echoCancellation: true,// 回音消除
+//                     deviceId: videoDeviceIds ? videoDeviceIds : undefined
+//                 },
+//                 video: {
+//                     width: 320,
+//                     height: 240,
+//                     frameRate: { ideal: 10, max: 15 },
+//                     deviceId: audioDeviceIds ? audioDeviceIds : undefined
+//                 },
+
+//             };
+
+//             navigator.mediaDevices.getUserMedia(constraints).then(function (mediaStream) {
+//                 localStream = mediaStream;
+//                 // 获取视频的track
+//                 const videoTrack = mediaStream.getVideoTracks()[0];
+//                 //拿到video的所有约束
+//                 const videoConstraints = videoTrack.getSettings();
+//                 // 转成jsonstring显示到div标签上
+//                 showDiv.textContent = JSON.stringify(videoConstraints, null, 2);
+
+
+//                 videoPlayer.srcObject = mediaStream;
+//                 videoPlayer.onloadedmetadata = function (e) {
+//                     videoPlayer.play();
+//                 };
+//                 // 获取权限后开始获取设备
+//                 return resolve(mediaStream);
+//             }).catch((err) => {
+//                 return reject(err);
+//                 console.log(err.name + ": " + err.message);
+//             }); // 总是在最后检查错误
+//         }
+//     });
+// }
+
+
+      function LoadLocalVideoAudio(){
+        var localvideo = document.getElementById("localVideo");
+        var localaudio = document.getElementById("localAudio");
+        if(localvideo.checked||localaudio.ckecked){
+             local=document.getElementById('localvideo')
+            // #获取显示摄像头数据的video 
+            // const video = document.querySelector('video');
+            
+            // #getUserMedia 参数，这里只获取视频
+            const constraints = {
+              audio: {
+                audio:localaudio.ckecked,
+                noiseSuppression: true, // 降噪
+                echoCancellation: true,// 回音消除
+              },//false,
+              video: localvideo.checked?{ width: 320, height: 240 }:false//true
+
+            };
+            //             var constraints = {
+            //     audio: {
+            //         noiseSuppression: true, // 降噪
+            //         echoCancellation: true,// 回音消除
+            //         deviceId: videoDeviceIds ? videoDeviceIds : undefined
+            //     },
+            //     video: {
+            //         width: 320,
+            //         height: 240,
+            //         frameRate: { ideal: 10, max: 15 },
+            //         deviceId: audioDeviceIds ? audioDeviceIds : undefined
+            //     },
+
+            // };
+            let localvideook=false;
+            // 把摄像头的数据展示在video上
+            function handleSuccess(stream) {
+              window.stream = stream;
+              local.srcObject = stream;
+              local.muted= true;
+              localStream = stream;
+            //   pc.addTrack(stream.getTracks()[0], stream);
+            //   localvideook=true;
+            }
+            
+            // #错误处理
+            function handleError(error) {
+              console.log('navigator.MediaDevices.getUserMedia error: ', error.message, error.name);
+            }
+            
+            // #获取摄像头数据并回调
+            navigator.mediaDevices.getUserMedia(constraints).then(handleSuccess).catch(handleError);
+            // while(!localvideook);
+
+        }
+        if (supportsSetCodecPreferences) {
+          const { codecs } = RTCRtpSender.getCapabilities('video');
+          console.log('RTCRtpSender.getCapabilities(video):\n', codecs);
+          codecs.forEach(codec => {
+            if (['video/red', 'video/ulpfec', 'video/rtx'].includes(codec.mimeType)) {
+              return;
+            }
+            const option = document.createElement('option');
+            option.value = (codec.mimeType + ' ' + (codec.sdpFmtpLine || '')).trim();
+            option.innerText = option.value;
+            codecPreferences.appendChild(option);
+          });
+          codecPreferences.disabled = false;
+        } else {
+          console.warn('当前不支持更换codec');
+        }
+    }
+    onload=function() {
+      LoadLocalVideoAudio();
+    }
+  </script>
 </html>

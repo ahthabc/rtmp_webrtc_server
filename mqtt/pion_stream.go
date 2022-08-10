@@ -198,6 +198,27 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 						//break
 					}
 					stream.SendStreamVideo(b[:n])
+					// log.Debug("RTP:")
+					// log.InfoHex(b[:n],n)
+					
+				// 	pkt, _, err := track.ReadRTP()
+				// 	b=pkt.Payload
+				// 	if err!=nil{
+				// 		log.Debug(err)
+				// 	}
+                //    log.Debug("RTP:")
+				// 	// fmt.Println("RTP:",pkt)
+				// 	log.InfoHex(b,len(pkt.Payload)) 
+					// h264packet := H264Packet{}
+					// datas, err := h264packet.GetRTPRawH264(pkt)
+					// if err != nil {
+					// 	log.Debug(err)
+					// 	pps.bVideoStop = true
+					// 	continue
+					// 	//break
+					// }
+					// hex_string_data := hex.EncodeToString(b[:n])
+					// fmt.Println("rtp",hex_string_data)
 					// if n > 30 {
 					// 	n = 30
 					// }
@@ -244,6 +265,7 @@ func (pps *Stream) onTrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiv
 						continue
 						//break
 					}
+					// log.Debugln("rtp",pkt)
 					stream.SendStreamVideo(datas)
 				}
 				// ptklen := len(pkt.Payload)

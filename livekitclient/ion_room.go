@@ -330,7 +330,7 @@ func (r *Room) TrackPublished_to_ION(streamname string) error {
 	}
 	return nil
 }
-func (r *Room) RTPTrackPublished_to_ION(trackRemote *webrtc.TrackRemote, streamname string) error {
+func (r *Room) RTPTrackPublished_to_ION(trackRemote []*webrtc.TrackRemote, streamname string) error {
 	// - `in` implements io.ReadCloser, such as buffer or file
 	// - `mime` has to be one of webrtc.MimeType...
 	// videoTrack, err := lksdk.NewLocalSampleTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264})
@@ -357,44 +357,50 @@ func (r *Room) RTPTrackPublished_to_ION(trackRemote *webrtc.TrackRemote, streamn
 			log.Debug("ion track->", streamname, "<-is nil ,re Connect room", t, r)
 		}
 	}
-	if t.IONSfuTrack.VideoRTPTrack == nil {
-		if strings.Contains(trackRemote.Codec().MimeType, "video") {
-			videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, streamname+"-video", streamname)
-			if err != nil {
-				panic(err)
+	for _, v := range trackRemote {
+		if v.Kind().String() == "video" {
+			if t.IONSfuTrack.VideoRTPTrack == nil {
+				if strings.Contains(v.Codec().MimeType, "video") {
+					videoRTPTrack, err := webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-video", streamname)
+					if err != nil {
+						panic(err)
+					}
+					var pub []*webrtc.RTPSender
+					log.Debug("ion track publish", videoRTPTrack)
+					if pub, err = t.IONRtc.Publish(videoRTPTrack); err != nil {
+						log.Debug("Error publishing video RTP track->", err)
+						return err
+					}
+					t.IONVideopub = pub[0]
+					t.IONSfuTrack.VideoRTPTrack = videoRTPTrack
+					r.Localtracks[streamname] = t
+					log.Debug("[RTPTrackPublished_to_ION]", "published video track -> ", streamname)
+				}
 			}
-			var pub []*webrtc.RTPSender
-			log.Debug("ion track publish", videoRTPTrack)
-			if pub, err = t.IONRtc.Publish(videoRTPTrack); err != nil {
-				log.Debug("Error publishing video RTP track->", err)
-				return err
+		} else {
+			if v.Kind().String() == "audio" {
+				if t.IONSfuTrack.AudioRTPTrack == nil {
+					if strings.Contains(v.Codec().MimeType, "audio") {
+						audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(v.Codec().RTPCodecCapability, streamname+"-audio", streamname)
+						if err != nil {
+							panic(err)
+						}
+						// var local_audio *lksdk.LocalTrackPublication
+						var pub []*webrtc.RTPSender
+						log.Debug("ion track publish", audioRTPTrack)
+						if pub, err = t.IONRtc.Publish(audioRTPTrack); err != nil {
+							log.Debug("Error publishing audio track", err)
+							return err
+						}
+						t.IONAudiopub = pub[0]
+						t.IONSfuTrack.AudioRTPTrack = audioRTPTrack
+						r.Localtracks[streamname] = t
+						log.Debug("[RTPTrackPublished_to_ION]", "published audio track -> ", streamname)
+					}
+				}
 			}
-			t.IONVideopub = pub[0]
-			t.IONSfuTrack.VideoRTPTrack = videoRTPTrack
-			r.Localtracks[streamname] = t
-			log.Debug("[RTPTrackPublished_to_ION]", "published video track -> ", streamname)
 		}
 	}
-	if t.IONSfuTrack.AudioRTPTrack == nil {
-		if strings.Contains(trackRemote.Codec().MimeType, "audio") {
-			audioRTPTrack, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, streamname+"-audio", streamname)
-			if err != nil {
-				panic(err)
-			}
-			// var local_audio *lksdk.LocalTrackPublication
-			var pub []*webrtc.RTPSender
-			log.Debug("ion track publish", audioRTPTrack)
-			if pub, err = t.IONRtc.Publish(audioRTPTrack); err != nil {
-				log.Debug("Error publishing audio track", err)
-				return err
-			}
-			t.IONAudiopub = pub[0]
-			t.IONSfuTrack.AudioRTPTrack = audioRTPTrack
-			r.Localtracks[streamname] = t
-			log.Debug("[RTPTrackPublished_to_ION]", "published audio track -> ", streamname)
-		}
-	}
-
 	// r.Localtracks[streamname] = t
 
 	// } else {

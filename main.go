@@ -9,7 +9,9 @@ import (
 
 	"github.com/xiangxud/rtmp_webrtc_server/config"
 	"github.com/xiangxud/rtmp_webrtc_server/turnserver"
+
 	// "github.com/xiangxud/rtmp_webrtc_server/livekitserver"
+
 	"github.com/xiangxud/rtmp_webrtc_server/log"
 	"github.com/xiangxud/rtmp_webrtc_server/util"
 
@@ -37,8 +39,34 @@ func main() {
 	go startRTMPServer(ctx, m)
 	go mqtt.StartMqtt(ctx)
 	go turnserver.TurnServer() //livekit always turnserver in livekit package
+	// http.Handle("/ws", http.FileServer(http.Dir("./web_client")))
+	// go panic(http.ListenAndServe(":8087", nil))
 	http.Handle("/", http.FileServer(http.Dir("./web_client")))
-	go panic(http.ListenAndServe(":8088", nil))
+	// go panic(http.ListenAndServeTLS(":8088", "rootCA.crt", "rootCA.key", nil))
+	go panic(http.ListenAndServeTLS(":8088", "./ssl_ca/rootCA.crt", "./ssl_ca/rootCA.key", nil))
+	// go httpsserve.Serve("0.0.0.0:8088", "./web_client")
+	// http.Handle("/face", http.FileServer(http.Dir("./web_client")))
+	// go panic(http.ListenAndServe(":8089", nil))
 	<-ctx.Done()
 	log.Debugf("stop signal caught, stopping... pid=%d\n", os.Getpid())
 }
+
+// func Serve(listenAdress string){
+// 	cert, err := genCertificate()
+// 	if err != nil {
+// 		logger.Fatal(err)
+// 	}
+// 	http.Handle("/", http.FileServer(http.Dir("./web_client")))
+// 	// go panic(http.ListenAndServe(":8088", nil))
+// 	// httpsserve
+// 	server := &http.Server{
+// 		Addr: listenAdress,
+// 		TLSConfig: 	&tls.Config{Certificates: []tls.Certificate{cert},},
+// 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 			proxy.Serve(w, r)
+// 		}),
+// 	}
+
+// 	log.Fatal(server.ListenAndServe())
+
+// }

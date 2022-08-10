@@ -19,11 +19,37 @@ function initMqtt() {
         return;
     }
     var ClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8)
+    // var options = {
+    //     invocationContext: {
+    //         host: hostname,
+    //         port: port,
+    //         path: client.path,
+    //         clientId: clientId
+    //     },
+    //     timeout: timeout,
+    //     keepAliveInterval: keepAlive,
+    //     cleanSession: cleanSession,
+    //     useSSL: ssl,//wss传输
+    //     userName: userName,  
+    //     password: password,  
+    //     onSuccess: onConnect,
+    //     mqttVersion: 4,
+    //     onFailure: function (e) {
+    //         console.log(e);
+    //         s = "{time:" + new Date().Format("yyyy-MM-dd hh:mm:ss") + ", onFailure()}";
+    //         console.log(s);
+    //     }
+    // };
     mqttclient = mqtt.connect(MqttServer,
         {
             clientId: ClientId,
+            // useSSL: true,
+            // protocol: "wss",
+            // rejectUnauthorized: false,
+            // ca: 'CA signed server certificate',
             username: 'admin',
-            password: 'password'
+            password: 'password',
+            // port: 8084
         });
     mqttclient.on('connect', function () {
         mqttclient.subscribe(subtopic, function (err) {

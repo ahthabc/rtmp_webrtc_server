@@ -30,5 +30,6 @@ function controlSend() {
     if (bcontrolopen) {
         var msg = document.getElementById("controlInput").value;//$("#controlInput").val();
         controlDC.send(msg);
+        console.log("datachannel send",msg);
     }
 }

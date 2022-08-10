@@ -1,0 +1,116 @@
+
+//https://webrtchacks.com/still-image-from-webcam-stream-approaches/
+const processor = new MediaStreamTrackProcessor(track);
+const reader = await processor.readable.getReader();
+
+async function readFrame() {
+    const {value: frame, done} = await reader.read();
+    // value is the frame object
+    if (frame) {
+        const bitmap = await createImageBitmap(frame);
+        console.log(bitmap);
+        storage.push(bitmap);
+        imageCountSpan.innerText++;
+        frame.close();
+    }
+    if (done)
+        clearInterval(captureInterval);
+}
+
+const interval = (parseInt(intervalSec.value) >= 1 ? intervalSec.value * 1: 1) * 1000;
+captureInterval = setInterval(async ()=>await readFrame(), interval);
+//e2ee
+const sender = pc1.addTrack(stream.getVideoTracks()[0], stream);
+const senderStreams = sender.createEncodedVideoStreams() :
+const senderTransformStream = new TransformStream({
+    transform: (chunk, controller) {
+      console.log(chunk, chunk.data.byteLength);
+      controller.enqueue(chunk);
+    }
+  });
+senderStreams.readableStream
+  .pipeThrough(senderTransformStream)
+  .pipeTo(senderStreams.writableStream);
+
+  
+let faces;
+const faceDetection = new FaceDetection({locateFile: (file) => {
+  return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/${file}`;
+}});
+ 
+faceDetection.setOptions({
+  model: 'short',
+  minDetectionConfidence: 0.5,
+});
+faceDetection.onResults(results => {
+    console.log('update results', results);
+    // For a real "product" one would have to track the different boxes and their
+    // movement to prevent jumps.
+    faces = results;
+});
+
+
+navigator.mediaDevices.getUserMedia({video: {width, height}})
+  .then(async (stream) => {
+    localVideo.srcObject = stream;
+    // Update face detection every two ѕeconds.
+    setInterval(() => {
+        faceDetection.send({image: localVideo});
+    }, 2000);
+});
+
+if (!(typeof MediaStreamTrackProcessor === 'undefined'
+  || typeof MediaStreamTrackGenerator === 'undefined')) {
+    document.getElementById('notsupported').style.display = 'none';
+    navigator.mediaDevices.getUserMedia({video: {width, height}})
+      .then(async (stream) => {
+        localVideo.srcObject = stream;
+        // Update face detection every two ѕeconds.
+        setInterval(() => {
+            faceDetection.send({image: document.getElementById('localVideo')});
+        }, 2000);
+ 
+        const [track] = stream.getTracks();
+        const generator0 = new MediaStreamTrackGenerator('video');
+        const generator1 = new MediaStreamTrackGenerator('video');
+        crop0.srcObject = new MediaStream([generator0]);
+        crop1.srcObject = new MediaStream([generator1]);
+        // to be continued...
+        const processor0 = new MediaStreamTrackProcessor(track);
+        processor0.readable.pipeThrough(new TransformStream({
+            transform: (frame, controller) => transform(frame, controller, 0)
+        })).pipeTo(generator0.writable);
+        const processor1 = new MediaStreamTrackProcessor(track);
+        processor1.readable.pipeThrough(new TransformStream({
+            transform: (frame, controller) => transform(frame, controller, 1)
+        })).pipeTo(generator1.writable);
+ 
+    });
+}        
+
+async function transform(frame, controller, index) {
+  if (faces && faces.detections[index]) {
+      //console.log('DETECTED', faces.detections.length, faces.detections, frame);
+      const box = faces.detections[index].boundingBox;
+      ctx.drawImage(frame,
+          Math.min(Math.max(
+            Math.floor(box.xCenter * frame.codedWidth) - boxWidth / 2, 0),
+            frame.codedWidth - boxWidth),
+          Math.min(Math.max(
+            Math.floor(box.yCenter * frame.codedHeight) - boxHeight / 2, 0),
+            frame.codedHeight - boxHeight),
+          boxWidth, boxHeight,
+          0, 0, boxWidth, boxHeight);
+      const newFrame = new VideoFrame(canvas);
+      controller.enqueue(newFrame);
+  }
+  frame.close();
+}
+
+const [track] = stream.getTracks();
+const generator0 = new MediaStreamTrackGenerator('video');
+generator0.addEventListener('mute', () => console.log('first generator muted'));
+generator0.addEventListener('unmute', () => console.log('first generator unmuted'));
+const generator1 = new MediaStreamTrackGenerator('video');
+generator1.addEventListener('mute', () => console.log('second generator muted'));
+generator1.addEventListener('unmute', () => console.log('second generator unmuted'));
